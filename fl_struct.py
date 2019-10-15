@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import networkx as nx
 import numpy as np
 import ns.core
@@ -10,9 +8,9 @@ import ns.network
 import subprocess
 import os
 
-import hfl_param
-import hfl_core
-import hfl_util
+import fl_param
+import fl_core
+import fl_util
 
 # LINKSPEED = '10Mbps', SIM_SIM_DATA_SIZE = 40000 도 비슷한 결과라서 시뮬레이션 빨리 하기 위해 SIM_DATA_SIZE 를 낮춤
 # 시뮬레이션은 SIM_DATA_SIZE 크기가 클 수록 패킷 수가 늘어나서 오래걸림
@@ -196,7 +194,7 @@ class FatTree:
         def toSec(d):
             # 10: Network Simulation 을 빨리 하기 위해 1MBps/1000크기(10MBps/10000크기와 유사한 결과)로 했으며, 따라서 데이터 크기를 10 더 나눠줌
             # 4: Number of bytes for a float variable
-            return d / (SIM_DATA_SIZE * 10) * hfl_param.MODEL_SIZE * 4
+            return d / (SIM_DATA_SIZE * 10) * fl_param.MODEL_SIZE * 4
         #print('Total Bytes Received :', sum( ns.applications.PacketSink(sinkApps.Get(0)).GetTotalRx() for sinkApps in sinkAppsList ))
         maxPcapTime = max( getPcapTime('pcap/' + fileName) for fileName in os.listdir('pcap') )
         if maxPcapTime == -1: raise Exception()
@@ -263,7 +261,7 @@ class Cloud:
     def digest(self, z, debugging=False):
         self.z = z
         # Node Grouping 업데이트
-        nids_byGid = hfl_util.to_nids_byGid(z)
+        nids_byGid = fl_util.to_nids_byGid(z)
         if nids_byGid == None:
             self.ready = False
             return False

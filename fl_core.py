@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
-
 import tensorflow as tf
 import numpy as np
 
-import hfl_param
+import fl_param
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -229,48 +227,48 @@ def local_train(w_, dataBatch_i_, lr_, tau1_):
             x_shape = [None] + [ x_shape_[j] for j in range(1, len(x_shape_)) ]
             x = tf.placeholder(name='x', shape=x_shape, dtype=tf.float32)
             y = tf.placeholder(name='y', shape=[None], dtype=tf.int32)
-            if hfl_param.MODEL_NAME == 'sr':
+            if fl_param.MODEL_NAME == 'sr':
                 (loss, w) = loss_sr(w_, x_shape_, x, y)
-            elif hfl_param.MODEL_NAME == 'cnn':
-                if hfl_param.DATA_NAME == 'mnist-o' or hfl_param.DATA_NAME == 'mnist-f':
+            elif fl_param.MODEL_NAME == 'cnn':
+                if fl_param.DATA_NAME == 'mnist-o' or fl_param.DATA_NAME == 'mnist-f':
                     (loss, w) = loss_cnn(w_, x_shape_, x, y)
-                elif hfl_param.DATA_NAME == 'cifar10':
+                elif fl_param.DATA_NAME == 'cifar10':
                     (loss, w) = loss_cnn_cifar10(w_, x_shape_, x, y)
                 else:
-                    raise Exception(hfl_param.MODEL_NAME, hfl_param.DATA_NAME)
-            elif hfl_param.MODEL_NAME == '2nn':
+                    raise Exception(fl_param.MODEL_NAME, fl_param.DATA_NAME)
+            elif fl_param.MODEL_NAME == '2nn':
                 (loss, w) = loss_2nn(w_, x_shape_, x, y)
-            elif hfl_param.MODEL_NAME == 'svm':
+            elif fl_param.MODEL_NAME == 'svm':
                 (loss, w) = loss_svm(w_, x_shape_, x, y)
             else:
-                raise Exception(hfl_param.MODEL_NAME)
+                raise Exception(fl_param.MODEL_NAME)
             # 직접 gradients 계산하는 대신 Optimizer 에서 계산된 gradients 사용
             lr = tf.placeholder(name='lr', shape=[], dtype=tf.float32)
             train_op = tf.train.GradientDescentOptimizer(lr).minimize(loss)
             
             sess.run(tf.global_variables_initializer())
             w_byTime = []
-            if not hfl_param.SGD_ENABLED:
+            if not fl_param.SGD_ENABLED:
                 for _ in range(tau1_):
                     sess.run(train_op, feed_dict={lr: lr_, x: dataBatch_i_['x'], y: dataBatch_i_['y']})
                     w_ = sess.run(w, feed_dict={lr: lr_, x: dataBatch_i_['x'], y: dataBatch_i_['y']})
                     w_byTime.append(w_)
         #             loss_ = sess.run(loss, feed_dict={lr: lr_, x: dataBatch_i_['x'], y: dataBatch_i_['y']})
         #             print(lr_, loss_)
-                    lr_ *= hfl_param.LR_DECAY_RATE
+                    lr_ *= fl_param.LR_DECAY_RATE
             else:
                 numEpochSamples = dataBatch_i_['x'].shape[0]
-                numItersPerEpoch = int(np.ceil(numEpochSamples / hfl_param.BATCH_SIZE).tolist())
+                numItersPerEpoch = int(np.ceil(numEpochSamples / fl_param.BATCH_SIZE).tolist())
                 for t1 in range(tau1_):
                     for it in range(numItersPerEpoch):
-                        (sampleBatch_x, sampleBatch_y) = next_batch(hfl_param.BATCH_SIZE, dataBatch_i_)
+                        (sampleBatch_x, sampleBatch_y) = next_batch(fl_param.BATCH_SIZE, dataBatch_i_)
                         sess.run(train_op, feed_dict={lr: lr_, x: sampleBatch_x, y: sampleBatch_y})
                     # Epoch 마다 정보 저장
                     w_ = sess.run(w, feed_dict={lr: lr_, x: sampleBatch_x, y: sampleBatch_y})
                     w_byTime.append(w_)
         #             vs = sess.run(tf.concat([ tf.reshape(layer, [-1]) for layer in tf.get_collection(tf.GraphKeys.VARIABLES) ], axis=0))
         #             numVars = vs.shape ; print(numVars)
-                    lr_ *= hfl_param.LR_DECAY_RATE
+                    lr_ *= fl_param.LR_DECAY_RATE
     return w_byTime, w_
 
 def federated_train_collect(w, trainData_byNid, lr, tau1):
@@ -309,35 +307,35 @@ def evaluate(w_, dataBatch_):
             x_shape = [None] + [ x_shape_[j] for j in range(1, len(x_shape_)) ]
             x = tf.placeholder(name='x', shape=x_shape, dtype=tf.float32)
             y = tf.placeholder(name='y', shape=[None], dtype=tf.int32)
-            if hfl_param.MODEL_NAME == 'sr':
+            if fl_param.MODEL_NAME == 'sr':
                 (loss, w) = loss_sr(w_, x_shape_, x, y)
                 y_hat = predict_sr(w, x)
-            elif hfl_param.MODEL_NAME == 'cnn':
-                if hfl_param.DATA_NAME == 'mnist-o' or hfl_param.DATA_NAME == 'mnist-f':
+            elif fl_param.MODEL_NAME == 'cnn':
+                if fl_param.DATA_NAME == 'mnist-o' or fl_param.DATA_NAME == 'mnist-f':
                     (loss, w) = loss_cnn(w_, x_shape_, x, y)
                     y_hat = predict_cnn(w, x)
-                elif hfl_param.DATA_NAME == 'cifar10':
+                elif fl_param.DATA_NAME == 'cifar10':
                     (loss, w) = loss_cnn_cifar10(w_, x_shape_, x, y)
                     y_hat = predict_cnn_cifar10(w, x)
                 else:
-                    raise Exception(hfl_param.MODEL_NAME, hfl_param.DATA_NAME)
-            elif hfl_param.MODEL_NAME == '2nn':
+                    raise Exception(fl_param.MODEL_NAME, fl_param.DATA_NAME)
+            elif fl_param.MODEL_NAME == '2nn':
                 (loss, w) = loss_2nn(w_, x_shape_, x, y)
                 y_hat = predict_2nn(w, x)
-            elif hfl_param.MODEL_NAME == 'svm':
+            elif fl_param.MODEL_NAME == 'svm':
                 (loss, w) = loss_svm(w_, x_shape_, x, y)
                 y_hat = predict_svm(w, x)
             else:
-                raise Exception(hfl_param.MODEL_NAME)
+                raise Exception(fl_param.MODEL_NAME)
             accuracy = tf.reduce_mean(tf.cast(tf.equal(y_hat, y), tf.float32))
             
             sess.run(tf.global_variables_initializer())
 
             # Batch Size 만큼 나눠서 평가
-            numTestIters = min(hfl_param.NUM_TEST_ITERS, int(len(dataBatch_['x'])/hfl_param.BATCH_SIZE))
+            numTestIters = min(fl_param.NUM_TEST_ITERS, int(len(dataBatch_['x'])/fl_param.BATCH_SIZE))
             losses_ = [] ; accs_ = [] ; idxBegin = 0 ; idxEnd = 0
             for i in range(numTestIters):
-                idxEnd += hfl_param.BATCH_SIZE
+                idxEnd += fl_param.BATCH_SIZE
                 sampleBatch_x = dataBatch_['x'][idxBegin:idxEnd]
                 sampleBatch_y = dataBatch_['y'][idxBegin:idxEnd]
                 (loss_, acc_) = sess.run((loss, accuracy), feed_dict={x: sampleBatch_x, y: sampleBatch_y})
@@ -354,21 +352,21 @@ def local_gradients(w_, dataBatch_):
             x_shape = [None] + [ x_shape_[j] for j in range(1, len(x_shape_)) ]
             x = tf.placeholder(name='x', shape=x_shape, dtype=tf.float32)
             y = tf.placeholder(name='y', shape=[None], dtype=tf.int32)
-            if hfl_param.MODEL_NAME == 'sr':
+            if fl_param.MODEL_NAME == 'sr':
                 (loss, w) = loss_sr(w_, x_shape_, x, y)
-            elif hfl_param.MODEL_NAME == 'cnn':
-                if hfl_param.DATA_NAME == 'mnist-o' or hfl_param.DATA_NAME == 'mnist-f':
+            elif fl_param.MODEL_NAME == 'cnn':
+                if fl_param.DATA_NAME == 'mnist-o' or fl_param.DATA_NAME == 'mnist-f':
                     (loss, w) = loss_cnn(w_, x_shape_, x, y)
-                elif hfl_param.DATA_NAME == 'cifar10':
+                elif fl_param.DATA_NAME == 'cifar10':
                     (loss, w) = loss_cnn_cifar10(w_, x_shape_, x, y)
                 else:
-                    raise Exception(hfl_param.MODEL_NAME, hfl_param.DATA_NAME)
-            elif hfl_param.MODEL_NAME == '2nn':
+                    raise Exception(fl_param.MODEL_NAME, fl_param.DATA_NAME)
+            elif fl_param.MODEL_NAME == '2nn':
                 (loss, w) = loss_2nn(w_, x_shape_, x, y)
-            elif hfl_param.MODEL_NAME == 'svm':
+            elif fl_param.MODEL_NAME == 'svm':
                 (loss, w) = loss_svm(w_, x_shape_, x, y)
             else:
-                raise Exception(hfl_param.MODEL_NAME)
+                raise Exception(fl_param.MODEL_NAME)
             g = tf.gradients(loss, w)
             
             sess.run(tf.global_variables_initializer())
@@ -389,171 +387,3 @@ def np_flatten(model):
     for i in range(len(model)):
         model_ += model[i].flatten().tolist()
     return np.array(model_)
-
-########################################################################################## Deprecated
-
-# 학습 과정에서 Gradient 추출하기 위해 Tensorflow Source code 참조
-# https://github.com/tensorflow/tensorflow/blob/r1.14/tensorflow/python/training/optimizer.py#L217-L1242
-def minimize(optimizer, loss, global_step=None, var_list=None, gate_gradients=1, aggregation_method=None, colocate_gradients_with_ops=False, name=None, grad_loss=None):
-    grads_and_vars = optimizer.compute_gradients( loss, var_list=var_list, gate_gradients=gate_gradients, aggregation_method=aggregation_method,
-                                                 colocate_gradients_with_ops=colocate_gradients_with_ops, grad_loss=grad_loss)
-    
-    vars_with_grad = [v for g, v in grads_and_vars if g is not None]
-    grad = [g for g, v in grads_and_vars if g is not None]
-    if not vars_with_grad:
-        raise ValueError([str(v) for _, v in grads_and_vars], loss)
-    return optimizer.apply_gradients(grads_and_vars, global_step=global_step, name=name), grad
-
-def federated_train_collect2(w_, trainData_byNid_, lr_, tau1_):
-    graph = tf.Graph()
-    with graph.as_default():
-        with tf.Session(config=config, graph=graph) as sess:
-            ws = [] ; xs = [] ; ys = [] ; lrs = [] ; train_ops = []
-            x_shape_ = trainData_byNid_[0]['x'].shape
-            x_shape = [None] + [ x_shape_[j] for j in range(1, len(x_shape_)) ]
-            for i in range(len(trainData_byNid_)): # Node 개수만큼 TF 변수 생성
-                x = tf.placeholder(name='x' + str(i), shape=x_shape, dtype=tf.float32)
-                y = tf.placeholder(name='y' + str(i), shape=[None], dtype=tf.int32)
-                if hfl_param.MODEL_NAME == 'sr':
-                    (loss, w) = loss_sr(w_, x_shape_, x, y, i)
-                elif hfl_param.MODEL_NAME == 'cnn':
-                    if hfl_param.DATA_NAME == 'mnist-o' or hfl_param.DATA_NAME == 'mnist-f':
-                        (loss, w) = loss_cnn(w_, x_shape_, x, y, i)
-                    elif hfl_param.DATA_NAME == 'cifar10':
-                        (loss, w) = loss_cnn_cifar10(w_, x_shape_, x, y, i)
-                    else:
-                        raise Exception(hfl_param.MODEL_NAME, hfl_param.DATA_NAME)
-                elif hfl_param.MODEL_NAME == '2nn':
-                    (loss, w) = loss_2nn(w_, x_shape_, x, y, i)
-                elif hfl_param.MODEL_NAME == 'svm':
-                    (loss, w) = loss_svm(w_, x_shape_, x, y, i)
-                else:
-                    raise Exception(hfl_param.MODEL_NAME)
-                lr = tf.placeholder(name='lr' + str(i), shape=[], dtype=tf.float32)
-                train_op = tf.train.GradientDescentOptimizer(lr).minimize(loss)
-                ws.append(w) ; xs.append(x) ; ys.append(y) ; lrs.append(lr) ; train_ops.append(train_op)
-                
-            sess.run(tf.global_variables_initializer())
-            w_byNid_byTime_ = []
-            if not hfl_param.SGD_ENABLED:
-                for _ in range(tau1_):
-                    feed_dict = { xs[i]:trainData_byNid_[i]['x'] for i in range(len(trainData_byNid_)) }
-                    feed_dict.update({ ys[i]:trainData_byNid_[i]['y'] for i in range(len(trainData_byNid_)) })
-                    feed_dict.update({ lrs[i]:lr_ for i in range(len(trainData_byNid_)) })
-                    sess.run(train_ops, feed_dict=feed_dict)
-                    w_last_byNid_ = sess.run(ws, feed_dict=feed_dict)
-                    w_byNid_byTime_.append(w_last_byNid_)
-                    lr_ *= hfl_param.LR_DECAY_RATE
-            else:
-                numEpochSamples = trainData_byNid_[0]['x'].shape[0]
-                numItersPerEpoch = int(np.ceil(numEpochSamples / hfl_param.BATCH_SIZE).tolist())
-                for t1 in range(tau1_):
-                    for it in range(numItersPerEpoch):
-                        feed_dict = {}
-                        for i in range(len(trainData_byNid_)):
-                            (sampleBatch_x, sampleBatch_y) = next_batch(hfl_param.BATCH_SIZE, trainData_byNid_[i])
-                            feed_dict.update({ xs[i]:sampleBatch_x })
-                            feed_dict.update({ ys[i]:sampleBatch_y })
-                            feed_dict.update({ lrs[i]:lr_ })
-                        sess.run(train_ops, feed_dict=feed_dict)
-                        w_last_byNid_ = sess.run(ws, feed_dict=feed_dict)
-                    # Epoch 마다 정보 저장
-                    w_byNid_byTime_.append(w_last_byNid_)
-                    lr_ *= hfl_param.LR_DECAY_RATE
-            w_byTime_byNid_ = [ [ w_byNid_byTime_[t][i] for t in range(tau1_) ] for i in range(len(trainData_byNid_)) ]
-    return w_byTime_byNid_, w_last_byNid_
-
-def federated_collect_gradients2(w_, nid2_Data_i_):
-    graph = tf.Graph()
-    with graph.as_default():
-        with tf.Session(config=config, graph=graph) as sess:
-            x_shape_ = nid2_Data_i_[0]['x'].shape
-            x_shape = [None] + [ x_shape_[j] for j in range(1, len(x_shape_)) ]
-            xs = [] ; ys = [] ; gs = []
-            for nid in range(len(nid2_Data_i_.keys())): # nid 순서 상관없이 Node 개수만큼 TF 변수 생성
-                x = tf.placeholder(name='x' + str(nid), shape=x_shape, dtype=tf.float32)
-                y = tf.placeholder(name='y' + str(nid), shape=[None], dtype=tf.int32)
-                if hfl_param.MODEL_NAME == 'sr':
-                    (loss, w) = loss_sr(w_, x_shape_, x, y, nid)
-                elif hfl_param.MODEL_NAME == 'cnn':
-                    if hfl_param.DATA_NAME == 'mnist-o' or hfl_param.DATA_NAME == 'mnist-f':
-                        (loss, w) = loss_cnn(w_, x_shape_, x, y, nid)
-                    elif hfl_param.DATA_NAME == 'cifar10':
-                        (loss, w) = loss_cnn_cifar10(w_, x_shape_, x, y, nid)
-                    else:
-                        raise Exception(hfl_param.MODEL_NAME, hfl_param.DATA_NAME)
-                elif hfl_param.MODEL_NAME == '2nn':
-                    (loss, w) = loss_2nn(w_, x_shape_, x, y, nid)
-                elif hfl_param.MODEL_NAME == 'svm':
-                    (loss, w) = loss_svm(w_, x_shape_, x, y, nid)
-                else:
-                    raise Exception(hfl_param.MODEL_NAME)
-                g = tf.gradients(loss, w)
-                xs.append(x) ; ys.append(y) ; gs.append(g)
-                
-            sess.run(tf.global_variables_initializer())
-            feed_dict = { xs[nid]:nid2_Data_i_[nid]['x'] for nid in nid2_Data_i_ }
-            feed_dict.update({ ys[nid]:nid2_Data_i_[nid]['y'] for nid in nid2_Data_i_ })
-            gs_ = sess.run(gs, feed_dict=feed_dict) # gs_[nid] 에 xs[nid] 와 ys[nid] 의 결과가 나옴
-            nid2_gs_ = { nid:gs_[nid] for nid in nid2_Data_i_ }
-            gs_ = [ gs_[nid] for nid in nid2_Data_i_ ] # nid 순으로 정렬
-    return gs_, nid2_gs_
-
-def np_modelEquals(model1, model2):
-    model1_ = [] ; model2_ = []
-    for i in range(len(model1)):
-        model1_ += model1[i].flatten().tolist()
-        model2_ += model2[i].flatten().tolist()
-    return model1_ == model2_
-
-def tf_normOfDiff(model1, model2):
-    model1_ = tf.concat([ tf.reshape(layer, [-1]) for layer in model1 ], axis=0)
-    model2_ = tf.concat([ tf.reshape(layer, [-1]) for layer in model2 ], axis=0)
-    return tf.norm(model1_ - model2_)
-
-def local_estimate(w_, w_i_, g_i__w_, g_i__w_i_, dataBatch_i_):
-    graph = tf.Graph()
-    with graph.as_default():
-        with tf.Session(config=config, graph=graph) as sess:
-            x_shape_ = dataBatch_i_['x'].shape
-            x_shape = [None] + [ x_shape_[j] for j in range(1, len(x_shape_)) ]
-            x_i = tf.placeholder(name='x', shape=x_shape, dtype=tf.float32)
-            y_i = tf.placeholder(name='y', shape=[None], dtype=tf.int32)
-            if hfl_param.MODEL_NAME == 'sr':
-                (loss_i__w, w) = loss_sr(w_, x_shape_, x_i, y_i, 0)
-                (loss_i__w_i, w_i) = loss_sr(w_i_, x_shape_, x_i, y_i, 1)
-                g_i__w = get_gradients_sr(loss_i__w, g_i__w_, 0)
-                g_i__w_i = get_gradients_sr(loss_i__w_i, g_i__w_i_, 1)
-            elif hfl_param.MODEL_NAME == 'cnn':
-                if hfl_param.DATA_NAME == 'mnist-o' or hfl_param.DATA_NAME == 'mnist-f':
-                    (loss_i__w, w) = loss_cnn(w_, x_shape_, x_i, y_i, 0)
-                    (loss_i__w_i, w_i) = loss_cnn(w_i_, x_shape_, x_i, y_i, 1)
-                elif hfl_param.DATA_NAME == 'cifar10':
-                    (loss_i__w, w) = loss_cnn_cifar10(w_, x_shape_, x_i, y_i, 0)
-                    (loss_i__w_i, w_i) = loss_cnn_cifar10(w_i_, x_shape_, x_i, y_i, 1)
-                else:
-                    raise Exception(hfl_param.MODEL_NAME, hfl_param.DATA_NAME)
-                g_i__w = get_gradients_cnn(loss_i__w, g_i__w_, 0)
-                g_i__w_i = get_gradients_cnn(loss_i__w_i, g_i__w_i_, 1)
-            elif hfl_param.MODEL_NAME == '2nn':
-                (loss_i__w, w) = loss_2nn(w_, x_shape_, x_i, y_i, 0)
-                (loss_i__w_i, w_i) = loss_2nn(w_i_, x_shape_, x_i, y_i, 1)
-                g_i__w = get_gradients_2nn(loss_i__w, g_i__w_, 0)
-                g_i__w_i = get_gradients_2nn(loss_i__w_i, g_i__w_i_, 1)
-            elif hfl_param.MODEL_NAME == 'svm':
-                (loss_i__w, w) = loss_svm(w_, x_shape_, x_i, y_i, 0)
-                (loss_i__w_i, w_i) = loss_svm(w_i_, x_shape_, x_i, y_i, 1)
-                g_i__w = get_gradients_svm(loss_i__w, g_i__w_, 0)
-                g_i__w_i = get_gradients_svm(loss_i__w_i, g_i__w_i_, 1)
-            else:
-                raise Exception(hfl_param.MODEL_NAME)
-            #rho_i = tf.divide(tf.abs(loss_i__w - loss_i__w_i), tf_normOfDiff(w, w_i))
-            beta_i = tf.divide(tf_normOfDiff(g_i__w, g_i__w_i), tf_normOfDiff(w, w_i))
-
-            sess.run(tf.global_variables_initializer())
-            (beta_i_) = sess.run(beta_i, feed_dict={x_i: dataBatch_i_['x'], y_i: dataBatch_i_['y']})
-    return beta_i_
-
-def federated_estimate(w, w_is, g_is__w, g_is__w_i, data_byNid, weight_byNid):
-    metrics_byNid = [ local_estimate(w, w_is[i], g_is__w[i], g_is__w_i[i], data_byNid[i]) for i in range(len(w_is)) ]
-    return np.average(metrics_byNid, axis=0, weights=weight_byNid)

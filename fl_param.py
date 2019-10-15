@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 MODEL_NAME = 'svm' # svm, sr / cnn / 2nn
 DATA_NAME = 'cifar10' # mnist-o / mnist-f / cifar10
 NUM_NODES = 100
@@ -11,9 +9,9 @@ HIER_FAVG_TAU_2 = 1
 
 ################################################# Model parameter
 
-HIFLEX_NUM_SAMPLE_NODE = 100
-HIFLEX_MAX_STEADY_STEPS = 5
-HIFLEX_IID_GROUPING_INTERVAL = 10000
+CH_FEDAVG_NUM_SAMPLE_NODE = 100
+CH_FEDAVG_MAX_STEADY_STEPS = 5
+CH_FEDAVG_IID_GROUPING_INTERVAL = 10000
 
 # Terminating Condition
 MAX_EPOCH = 1000

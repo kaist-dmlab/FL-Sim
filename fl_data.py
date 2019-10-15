@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import numpy as np
 import random
 
@@ -118,10 +116,3 @@ def groupByEdge(modelName, dataName, data, nodeType, edgeType, numNodes, numEdge
     data_byNid = np.array([ data_byNid[nid] for nids in nids_byEid for nid in nids ]) # Node 오름차순으로 데이터 정렬
     z = [ eid for eid in range(numEdges) for _ in range(numNodesPerEdge) ]
     return (data_byNid, z)
-
-def to_nids_byGid(z):
-    gids = np.unique(z)
-    for gid in range(len(gids)):
-        if not(gid in gids): return None
-    nids_byGid = [ [ nid for nid, gid in enumerate(z) if gid == gid_ ] for gid_ in gids ]
-    return nids_byGid
