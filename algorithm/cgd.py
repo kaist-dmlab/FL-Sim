@@ -1,6 +1,4 @@
 from algorithm.abc import AbstractAlgorithm
-import fl_param
-import fl_core
 
 class Algorithm(AbstractAlgorithm):
     
@@ -9,15 +7,15 @@ class Algorithm(AbstractAlgorithm):
     
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy'])
-        (trainData_by1Nid, testData_by1Nid, _, _) = self.initialize(self.args.nodeType, self.args.edgeType)
+        (trainData_by1Nid, testData_by1Nid, _, _) = self.initialize()
         
-        lr = fl_param.LR_INITIAL
+        lr = self.args.lrInitial
         w = None
         
-        for t in range(1, fl_param.MAX_EPOCH):
-            (w_byTime, _) = fl_core.federated_train(w, trainData_by1Nid, lr, 1, [1])
+        for t in range(1, self.args.maxEpoch):
+            (w_byTime, _) = self.model.federated_train(w, trainData_by1Nid, lr, 1, [1])
             w = w_byTime[0]
-            (loss, accuracy) = fl_core.evaluate(w, testData_by1Nid[0])
+            (loss, accuracy) = self.model.evaluate(w, testData_by1Nid[0])
             print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f' % (t, loss, accuracy))
             self.fwEpoch.writerow([t, loss, accuracy])
-            lr *= fl_param.LR_DECAY_RATE
+            lr *= self.args.lrDecayRate

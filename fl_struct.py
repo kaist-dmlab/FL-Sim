@@ -8,8 +8,6 @@ import ns.network
 import subprocess
 import os
 
-import fl_param
-import fl_core
 import fl_util
 
 # LINKSPEED = '10Mbps', SIM_SIM_DATA_SIZE = 40000 도 비슷한 결과라서 시뮬레이션 빨리 하기 위해 SIM_DATA_SIZE 를 낮춤
@@ -66,7 +64,7 @@ class FatTree:
         # Initialize hop distance
         self.dist = { nid1: { nid2: len(nx.shortest_path(self.g, nid1, nid2)) - 1 for nid2 in range(self.numNodes) } for nid1 in range(self.numNodes) }
                 
-    def simulate(self, subject, commPairs, edgeCombineEnabled):
+    def simulate(self, subject, commPairs, edgeCombineEnabled, modelSize):
         if edgeCombineEnabled:
             # 현재 통신 Src 중 같은 Edge 에 속하며 같은 Dst 을 가지는 것에 대해 하나만 Src 로 Combine
             combinedCommPairs = {}
@@ -194,7 +192,7 @@ class FatTree:
         def toSec(d):
             # 10: Network Simulation 을 빨리 하기 위해 1MBps/1000크기(10MBps/10000크기와 유사한 결과)로 했으며, 따라서 데이터 크기를 10 더 나눠줌
             # 4: Number of bytes for a float variable
-            return d / (SIM_DATA_SIZE * 10) * fl_param.MODEL_SIZE * 4
+            return d / (SIM_DATA_SIZE * 10) * modelSize * 4
         #print('Total Bytes Received :', sum( ns.applications.PacketSink(sinkApps.Get(0)).GetTotalRx() for sinkApps in sinkAppsList ))
         maxPcapTime = max( getPcapTime('pcap/' + fileName) for fileName in os.listdir('pcap') )
         if maxPcapTime == -1: raise Exception()
@@ -206,10 +204,11 @@ class FatTree:
         return self.dist[nid1][nid2]
     
 class Cloud:
-    def __init__(self, ft, data_byNid, numGroups):
+    def __init__(self, ft, data_byNid, numGroups, modelSize=-1):
         self.ft = ft
         self.data_byNid = data_byNid
-        self.groups = [ Group(k, ft, data_byNid) for k in range(numGroups) ]
+        self.modelSize = modelSize
+        self.groups = [ Group(k, ft, data_byNid, modelSize) for k in range(numGroups) ]
         self.ps_nid = 0 # 모든 노드와의 거리가 같으므로 처음 노드로 설정
         self.ready = False
         
@@ -243,14 +242,14 @@ class Cloud:
     
     def get_d_global(self, edgeCombineEnabled):
         if self.ready == False: raise Exception
-        return self.ft.simulate('d_global', [ [nid, self.ps_nid] for nid in self.N ], edgeCombineEnabled)
+        return self.ft.simulate('d_global', [ [nid, self.ps_nid] for nid in self.N ], edgeCombineEnabled, self.modelSize)
     
     def get_d_group(self, edgeCombineEnabled):
         if self.ready == False: raise Exception
         commPairs = []
         for g in self.groups:
             commPairs += [ [nid, g.ps_nid] for nid in g.get_N_k() ]
-        return self.ft.simulate('d_group', commPairs, edgeCombineEnabled)
+        return self.ft.simulate('d_group', commPairs, edgeCombineEnabled, self.modelSize)
     
     def get_Delta(self, nid2_g_i__w, g__w):
         if self.ready == False: raise Exception
@@ -286,10 +285,11 @@ class Cloud:
             return True
         
 class Group:
-    def __init__(self, k, ft, data_byNid):
+    def __init__(self, k, ft, data_byNid, modelSize):
         self.k = k
         self.ft = ft
         self.data_byNid = data_byNid
+        self.modelSize = modelSize
         self.N_k = []
         self.ready = False
         

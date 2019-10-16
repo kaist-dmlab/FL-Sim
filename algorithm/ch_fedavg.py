@@ -3,9 +3,11 @@ import csv
 from time import gmtime, strftime #strftime("%m%d_%H%M%S", gmtime()) + ' ' + 
 
 from algorithm.abc import AbstractAlgorithm
-import fl_param
-import fl_core
 import fl_util
+
+CH_FEDAVG_NUM_SAMPLE_NODE = 100
+CH_FEDAVG_MAX_STEADY_STEPS = 5
+CH_FEDAVG_IID_GROUPING_INTERVAL = 10000
 
 def groupRandomly(numNodes, numGroups):
     numNodesPerGroup = int(numNodes / numGroups)
@@ -31,18 +33,18 @@ class Algorithm(AbstractAlgorithm):
     
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'time', 'aggrType', 'numGroups', 'tau1', 'tau2'])
-        (_, testData_by1Nid, _, c) = self.initialize(self.args.nodeType, self.args.edgeType)
+        (_, testData_by1Nid, _, c) = self.initialize()
         
         # 그룹 멤버쉽 랜덤 초기화
     #    z_rand = groupRandomly(len(c.get_N()), len(c.groups))
     #    c.digest(z_rand)
         
-        lr = fl_param.LR_INITIAL
+        lr = self.args.lrInitial
         input_w_ks = [ None for _ in c.groups ]
         d_global = c.get_d_global(True) ; d_group = c.get_d_group(True) ; d_sum = 0
         d_budget = self.args.opaque1
         
-    #     for t3 in range(int(fl_param.MAX_EPOCH/(tau1*tau2))):
+    #     for t3 in range(int(self.args.maxEpoch/(tau1*tau2))):
         t = 0 ; t_prev = 0 ; tau1 = 1 ; tau2 = 1 ; t3 = 0 ;
         while True:
             for t2 in range(tau2):
@@ -51,12 +53,12 @@ class Algorithm(AbstractAlgorithm):
                 output_w_ks = []
                 for k, g in enumerate(c.groups): # Group Aggregation
                     w_k = input_w_ks[k]
-                    (w_k_byTime, w_k_is) = fl_core.federated_train(w_k, g.get_Data_k_is(), lr, tau1, g.get_D_k_is())
+                    (w_k_byTime, w_k_is) = self.model.federated_train(w_k, g.get_Data_k_is(), lr, tau1, g.get_D_k_is())
                     w_is += w_k_is
                     w_k_byTime_byGid.append(w_k_byTime)
                     output_w_ks.append(w_k_byTime[-1])
                 input_w_ks = output_w_ks
-                w_byTime = fl_core.federated_aggregate(w_k_byTime_byGid, c.get_D_ks()) # Global Aggregation
+                w_byTime = self.model.federated_aggregate(w_k_byTime_byGid, c.get_D_ks()) # Global Aggregation
                 for t1 in range(tau1):
                     t += 1
                     if (t-t_prev) % tau1 == 0 and not((t-t_prev) % (tau1*tau2)) == 0:
@@ -67,28 +69,28 @@ class Algorithm(AbstractAlgorithm):
                         aggrType = 'Global'
                     else:
                         aggrType = ''
-                    (loss, accuracy) = fl_core.evaluate(w_byTime[t1], testData_by1Nid[0])
+                    (loss, accuracy) = self.model.evaluate(w_byTime[t1], testData_by1Nid[0])
                     print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f\ttime=%.4f\taggrType=%s\tnumGroups=%d\ttau1=%d\ttau2=%d'
                           % (t, loss, accuracy, d_sum, aggrType, len(c.groups), tau1, tau2))
                     self.fwEpoch.writerow([t, loss, accuracy, d_sum, aggrType, len(c.groups), tau1, tau2])
 
-                    lr *= fl_param.LR_DECAY_RATE
-    #                 if t >= fl_param.MAX_EPOCH: break
-    #             if t >= fl_param.MAX_EPOCH: break
-    #         if t >= fl_param.MAX_EPOCH: break
-                    if d_sum >= fl_param.MAX_TIME: break;
-                if d_sum >= fl_param.MAX_TIME: break;
-            if d_sum >= fl_param.MAX_TIME: break;
+                    lr *= self.args.lrDecayRate
+    #                 if t >= self.args.maxEpoch: break
+    #             if t >= self.args.maxEpoch: break
+    #         if t >= self.args.maxEpoch: break
+                    if d_sum >= self.args.maxTime: break;
+                if d_sum >= self.args.maxTime: break;
+            if d_sum >= self.args.maxTime: break;
 
             w = w_byTime[-1] # 출력을 위해 매 시간마다 수행했던 Global Aggregation 의 마지막 시간 값만 추출
             input_w_ks = [ w for _ in c.groups ]
 
-            if t3 % fl_param.CH_FEDAVG_IID_GROUPING_INTERVAL == 0:
+            if t3 % CH_FEDAVG_IID_GROUPING_INTERVAL == 0:
                 # Gradient Estimation
-                (g_is__w, nid2_g_i__w) = fl_core.federated_collect_gradients(w, c.get_nid2_Data_i())
-    #             (g_is__w2, nid2_g_i__w2) = fl_core.federated_collect_gradients2(w, c.get_nid2_Data_i())
+                (g_is__w, nid2_g_i__w) = self.model.federated_collect_gradients(w, c.get_nid2_Data_i())
+    #             (g_is__w2, nid2_g_i__w2) = self.model.federated_collect_gradients2(w, c.get_nid2_Data_i())
     #             for nid in nid2_g_i__w:
-    #                 print(fl_core.np_modelEquals(g_is__w[nid], g_is__w2[nid]), fl_core.np_modelEquals(nid2_g_i__w[nid], nid2_g_i__w2[nid]))
+    #                 print(self.model.np_modelEquals(g_is__w[nid], g_is__w2[nid]), self.model.np_modelEquals(nid2_g_i__w[nid], nid2_g_i__w2[nid]))
                 g__w = np.average(g_is__w, axis=0, weights=c.get_D_is())
 
                 # IID Grouping
@@ -106,7 +108,7 @@ class Algorithm(AbstractAlgorithm):
         self.fwDelta.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), 0, Delta_star, Delta_star])
         
         cntSteady = 0
-        while cntSteady < fl_param.CH_FEDAVG_MAX_STEADY_STEPS:
+        while cntSteady < CH_FEDAVG_MAX_STEADY_STEPS:
             (c, Delta) = self.iterate_IID_Grouping(c, nid2_g_i__w, g__w)
             if Delta_star > Delta:
                 (c_star, Delta_star) = (c, Delta)
@@ -134,11 +136,11 @@ class Algorithm(AbstractAlgorithm):
         # Iteration 마다 탐색 인덱스 셔플
         idx_Nid1 = np.arange(len(c.get_N()))
         np.random.shuffle(idx_Nid1)
-        idx_Nid1 = idx_Nid1[:fl_param.CH_FEDAVG_NUM_SAMPLE_NODE]
+        idx_Nid1 = idx_Nid1[:CH_FEDAVG_NUM_SAMPLE_NODE]
 
         idx_Nid2 = np.arange(len(c.get_N()))
         np.random.shuffle(idx_Nid2)
-        idx_Nid2 = idx_Nid2[:fl_param.CH_FEDAVG_NUM_SAMPLE_NODE]
+        idx_Nid2 = idx_Nid2[:CH_FEDAVG_NUM_SAMPLE_NODE]
 
         z = c.z
         for i in idx_Nid1:
