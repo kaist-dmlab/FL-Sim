@@ -88,14 +88,13 @@ class AbstractAlgorithm(ABC):
             trainData, testData = tf.keras.datasets.cifar10.load_data()
         else:
             raise Exception(self.args.dataName)
-
-        flatten = False if self.args.modelName == 'cnn' else True
-        trainData_by1Nid = fl_data.preprocess(self.args.modelName, self.args.dataName, trainData, flatten)
-        testData_by1Nid = fl_data.preprocess(self.args.modelName, self.args.dataName, testData, flatten)
+            
+        trainData_by1Nid = fl_data.preprocess(self.args.modelName, self.args.dataName, trainData, self.args.flatten)
+        testData_by1Nid = fl_data.preprocess(self.args.modelName, self.args.dataName, testData, self.args.flatten)
         (trainData_byNid, train_z) = fl_data.groupByEdge(self.args.modelName, self.args.dataName, trainData,
-                                                          self.args.nodeType, self.args.edgeType, self.args.numNodes, self.args.numEdges, flatten)
+                                                          self.args.nodeType, self.args.edgeType, self.args.numNodes, self.args.numEdges, self.args.flatten)
         (trainData_byNid_iid, train_z_iid) = fl_data.groupByEdge(self.args.modelName, self.args.dataName, trainData,
-                                                          self.args.nodeType, 'all', self.args.numNodes, self.args.numEdges, flatten)
+                                                          self.args.nodeType, 'all', self.args.numNodes, self.args.numEdges, self.args.flatten)
         print('Shape of trainData on 1st node:', trainData_byNid[0]['x'].shape, trainData_byNid[0]['y'].shape)
 
         ft = fl_struct.FatTree(self.args.numNodes, self.args.numEdges)

@@ -46,6 +46,10 @@ def parseArgs():
                     help='sgdEnabled',
                     type=bool,
                     default=False)
+    parser.add_argument('--flatten',
+                    help='flatten',
+                    type=bool,
+                    default=True)
     parser.add_argument('--maxEpoch',
                     help='maxEpoch',
                     type=int,
@@ -75,11 +79,17 @@ def parseArgs():
                     type=int,
                     default=-1)
     args = parser.parse_args()
-
+    
     args.numTestIters = int(10000 / args.batchSize)
     
-    if args.modelName == 'sr':
-        args.sgdEnabled = False
+    if args.modelName == 'svm':
+        args.maxTime = 25
+        args.lrInitial = 0.01
+        if args.dataName == 'cifar10':
+            args.modelSize = 3073
+        else:
+            raise Exception(args.modelName, args.dataName)
+    elif args.modelName == 'sr':
         args.maxTime = 50
         if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
             args.modelSize = 7850
@@ -99,22 +109,20 @@ def parseArgs():
             raise Exception(args.modelName, args.dataName)
     elif args.modelName == 'cnn':
         args.sgdEnabled = True
+        args.flatten = False
         if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
             args.maxTime = 1000
             args.modelSize = 369098
             args.lrInitial = 0.1
-        elif args.dataName == 'cifar10':
+        else:
+            raise Exception(args.modelName, args.dataName)
+    elif args.modelName == 'cnn_cifar10':
+        args.sgdEnabled = True
+        args.flatten = False
+        if args.dataName == 'cifar10':
             args.maxTime = 10000
             args.modelSize = 519754
             args.lrInitial = 0.01
-        else:
-            raise Exception(args.modelName, args.dataName)
-    elif args.modelName == 'svm':
-        args.sgdEnabled = False
-        args.maxTime = 25
-        args.lrInitial = 0.01
-        if args.dataName == 'cifar10':
-            args.modelSize = 3073
         else:
             raise Exception(args.modelName, args.dataName)
     else:

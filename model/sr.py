@@ -5,7 +5,7 @@ from model.abc import AbstractModel
 
 class Model(AbstractModel):
     
-    def loss(self, w_, x_shape_, x, y, callCnt=0):
+    def createModel(self, w_, x_shape_, x, y, callCnt=0):
         if w_ == None:
             x_shape = [ x_shape_[j] for j in range(1, len(x_shape_)) ] + [10]
             W = tf.get_variable('W' + str(callCnt), shape=x_shape, dtype=tf.float32, initializer=tf.zeros_initializer())
@@ -15,14 +15,9 @@ class Model(AbstractModel):
             b = tf.get_variable('b' + str(callCnt), dtype=tf.float32, initializer=w_[1])
         y_prob = tf.nn.softmax(tf.matmul(x, W) + b)
         loss = -tf.reduce_mean(tf.reduce_sum(tf.one_hot(y, 10) * tf.math.log(y_prob), axis=[1]))
-        return loss, [W, b]
-    
-    def predict(self, w, x):
-        W = w[0]
-        b = w[1]
-        y_prob = tf.nn.softmax(tf.matmul(x, W) + b)
+        
         y_hat = tf.cast(tf.argmax(y_prob, 1), tf.int32)
-        return y_hat
+        return [W, b], loss, y_hat
     
     def gradients(self, loss, g_, callCnt=0):
         gW = tf.get_variable('gW' + str(callCnt), dtype=tf.float32, initializer=g_[0])

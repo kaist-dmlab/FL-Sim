@@ -22,7 +22,7 @@ def average_w(w_byNid, weight_byNid):
     weight_byNid = np.array(weight_byNid) / sum(weight_byNid)
     w_avg = []
     for col in range(w_byNid.shape[1]):
-        sum_w = np.zeros(w_byNid[0, col].shape, dtype=np.float32)
+        sum_w = 0
         for row in range(w_byNid.shape[0]):
             sum_w += w_byNid[row, col] * weight_byNid[row]
         w_avg.append(sum_w)
@@ -40,15 +40,12 @@ class AbstractModel(ABC):
         self.config = tf.ConfigProto()
         self.config.gpu_options.allow_growth = True
         
-    def loss(self, w_, x_shape_, x, y, callCnt=0):
-        pass
-    
-    def predict(self, w, x):
+    def createModel(self, w_, x_shape_, x, y, callCnt=0):
         pass
     
     def gradients(self, loss, g_, callCnt=0):
         pass
-
+    
     def local_train(self, w_, dataBatch_i_, lr_, tau1_):
         graph = tf.Graph()
         with graph.as_default():
@@ -57,7 +54,7 @@ class AbstractModel(ABC):
                 x_shape = [None] + [ x_shape_[j] for j in range(1, len(x_shape_)) ]
                 x = tf.placeholder(name='x', shape=x_shape, dtype=tf.float32)
                 y = tf.placeholder(name='y', shape=[None], dtype=tf.int32)
-                (loss, w) = self.loss(w_, x_shape_, x, y)
+                (w, loss, _) = self.createModel(w_, x_shape_, x, y)
                 
                 # 직접 gradients 계산하는 대신 Optimizer 에서 계산된 gradients 사용
                 lr = tf.placeholder(name='lr', shape=[], dtype=tf.float32)
@@ -109,24 +106,22 @@ class AbstractModel(ABC):
                 x_shape = [None] + [ x_shape_[j] for j in range(1, len(x_shape_)) ]
                 x = tf.placeholder(name='x', shape=x_shape, dtype=tf.float32)
                 y = tf.placeholder(name='y', shape=[None], dtype=tf.int32)
-                (loss, w) = self.loss(w_, x_shape_, x, y)
-                y_hat = self.predict(w, x)
+                (w, loss, y_hat) = self.createModel(w_, x_shape_, x, y)
                 accuracy = tf.reduce_mean(tf.cast(tf.equal(y_hat, y), tf.float32))
                 
                 sess.run(tf.global_variables_initializer())
                 
                 # Batch Size 만큼 나눠서 평가
                 numTestIters = min(self.args.numTestIters, int(len(dataBatch_['x'])/self.args.batchSize))
-                losses_ = [] ; accs_ = [] ; idxBegin = 0 ; idxEnd = 0
+                loss_ = [] ; accs_ = [] ; idxBegin = 0 ; idxEnd = 0
                 for i in range(numTestIters):
                     idxEnd += self.args.batchSize
                     sampleBatch_x = dataBatch_['x'][idxBegin:idxEnd]
                     sampleBatch_y = dataBatch_['y'][idxBegin:idxEnd]
                     (loss_, acc_) = sess.run((loss, accuracy), feed_dict={x: sampleBatch_x, y: sampleBatch_y})
-                    losses_.append(loss_)
                     accs_.append(acc_)
                     idxBegin = idxEnd
-        return np.mean(losses_), np.mean(accs_)
+        return np.mean(loss_), np.mean(accs_)
     
     def local_gradients(self, w_, dataBatch_):
         graph = tf.Graph()
@@ -136,7 +131,7 @@ class AbstractModel(ABC):
                 x_shape = [None] + [ x_shape_[j] for j in range(1, len(x_shape_)) ]
                 x = tf.placeholder(name='x', shape=x_shape, dtype=tf.float32)
                 y = tf.placeholder(name='y', shape=[None], dtype=tf.int32)
-                (loss, w) = self.loss(w_, x_shape_, x, y)
+                (w, loss, _) = self.createModel(w_, x_shape_, x, y)
                 g = tf.gradients(loss, w)
                 
                 sess.run(tf.global_variables_initializer())

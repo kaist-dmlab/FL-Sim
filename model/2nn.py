@@ -11,7 +11,7 @@ class Model(AbstractModel):
         logits = tf.matmul(hidden_output_1, W_2) + b_2
         return logits
     
-    def loss(self, w_, x_shape_, x, y, callCnt=0):
+    def createModel(self, w_, x_shape_, x, y, callCnt=0):
         if w_ == None:
             tf.random.set_random_seed(1234) # 모든 노드가 같은 Initial Random Seed 를 갖지 않으면 학습되지 않음 (FedAvg 논문 참조)
             if len(x_shape_) != 2: raise Exception(x_shape_)
@@ -33,13 +33,10 @@ class Model(AbstractModel):
         y_onehot = tf.one_hot(y, 10)
         logits = self.get_logits_2nn(x, W_0, b_0, W_1, b_1, W_2, b_2)
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_onehot, logits=logits))
-        return loss, [W_0, b_0, W_1, b_1, W_2, b_2]
-    
-    def predict(self, w, x):
-        logits = self.get_logits_2nn(x, w[0], w[1], w[2], w[3], w[4], w[5])
+        
         y_prob = tf.nn.softmax(logits)
         y_hat = tf.squeeze(tf.cast(tf.argmax(y_prob, 1), tf.int32))
-        return y_hat
+        return [W_0, b_0, W_1, b_1, W_2, b_2], loss, y_hat
     
     def gradients(self, loss, g_, callCnt=0):
         gW_0 = tf.get_variable('W_0' + str(callCnt), dtype=tf.float32, initializer=g_[0])
