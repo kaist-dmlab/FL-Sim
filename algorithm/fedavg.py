@@ -10,7 +10,7 @@ class Algorithm(AbstractAlgorithm):
         (_, testData_by1Nid, c, _) = self.getInitVars()
         
         lr = self.args.lrInitial
-        w = self.model.getInitVars()
+        w = self.model.getParams()
         d_global = c.get_d_global(False) ; d_sum = 0
         
     #     for t2 in range(int(self.args.maxEpoch/tau1)):

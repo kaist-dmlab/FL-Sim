@@ -73,10 +73,6 @@ class AbstractModel(ABC):
     def createModel(self):
         pass
     
-    @abstractmethod
-    def getInitVars(self):
-        pass
-    
     def local_train(self, dataBatch_i_, lr_, tau1_):
         with self.graph.as_default():
             w_byTime = []

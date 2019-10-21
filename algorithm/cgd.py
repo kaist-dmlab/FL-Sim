@@ -10,7 +10,7 @@ class Algorithm(AbstractAlgorithm):
         (trainData_by1Nid, testData_by1Nid, _, _) = self.getInitVars()
         
         lr = self.args.lrInitial
-        w = self.model.getInitVars()
+        w = self.model.getParams()
         
         for t in range(1, self.args.maxEpoch):
             (w_byTime, _) = self.model.federated_train(w, trainData_by1Nid, lr, 1, [1])

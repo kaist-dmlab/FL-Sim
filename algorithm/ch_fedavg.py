@@ -40,7 +40,7 @@ class Algorithm(AbstractAlgorithm):
     #    c.digest(z_rand)
         
         lr = self.args.lrInitial
-        input_w_ks = [ self.model.getInitVars() for _ in c.groups ]
+        input_w_ks = [ self.model.getParams() for _ in c.groups ]
         d_global = c.get_d_global(True) ; d_group = c.get_d_group(True) ; d_sum = 0
         d_budget = self.args.opaque1
         
