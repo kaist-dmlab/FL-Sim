@@ -7,10 +7,10 @@ class Algorithm(AbstractAlgorithm):
     
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'time', 'aggrType'])
-        (_, testData_by1Nid, c, _) = self.initialize()
+        (_, testData_by1Nid, c, _) = self.getInitVars()
         
         lr = self.args.lrInitial
-        input_w_ks = [ None for _ in c.groups ]
+        input_w_ks = [ self.model.getInitVars() for _ in c.groups ]
         d_global = c.get_d_global(True) ; d_group = c.get_d_group(True) ; d_sum = 0
         
     #     for t3 in range(int(self.args.maxEpoch/(tau1*tau2))):

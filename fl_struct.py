@@ -191,8 +191,7 @@ class FatTree:
                 return float(lastLine.split()[0])
         def toSec(d):
             # 10: Network Simulation 을 빨리 하기 위해 1MBps/1000크기(10MBps/10000크기와 유사한 결과)로 했으며, 따라서 데이터 크기를 10 더 나눠줌
-            # 4: Number of bytes for a float variable
-            return d / (SIM_DATA_SIZE * 10) * modelSize * 4
+            return d / (SIM_DATA_SIZE * 10) * modelSize
         #print('Total Bytes Received :', sum( ns.applications.PacketSink(sinkApps.Get(0)).GetTotalRx() for sinkApps in sinkAppsList ))
         maxPcapTime = max( getPcapTime('pcap/' + fileName) for fileName in os.listdir('pcap') )
         if maxPcapTime == -1: raise Exception()

@@ -20,7 +20,7 @@ class Algorithm(AbstractAlgorithm):
     def __init__(self, args):
         super(Algorithm, self).__init__(args)
         
-        commonFileName = self.TITLE_PARAMS + '_' + self.getName()
+        commonFileName = self.getCommonFileName(self.args)
         self.fileDelta = open('logs/' + commonFileName + '_Delta.csv', 'w', newline='', buffering=1)
         self.fwDelta = csv.writer(self.fileDelta, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         
@@ -33,14 +33,14 @@ class Algorithm(AbstractAlgorithm):
     
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'time', 'aggrType', 'numGroups', 'tau1', 'tau2'])
-        (_, testData_by1Nid, _, c) = self.initialize()
+        (_, testData_by1Nid, _, c) = self.getInitVars()
         
         # 그룹 멤버쉽 랜덤 초기화
     #    z_rand = groupRandomly(len(c.get_N()), len(c.groups))
     #    c.digest(z_rand)
         
         lr = self.args.lrInitial
-        input_w_ks = [ None for _ in c.groups ]
+        input_w_ks = [ self.model.getInitVars() for _ in c.groups ]
         d_global = c.get_d_global(True) ; d_group = c.get_d_group(True) ; d_sum = 0
         d_budget = self.args.opaque1
         

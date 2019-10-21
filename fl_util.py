@@ -58,10 +58,6 @@ def parseArgs():
                     help='maxTime',
                     type=int,
                     default=-1)
-    parser.add_argument('--modelSize',
-                    help='modelSize',
-                    type=int,
-                    default=-1)
     parser.add_argument('--lrInitial',
                     help='lrInitial',
                     type=int,
@@ -85,17 +81,11 @@ def parseArgs():
     if args.modelName == 'svm':
         args.maxTime = 25
         args.lrInitial = 0.01
-        if args.dataName == 'cifar10':
-            args.modelSize = 3073
-        else:
-            raise Exception(args.modelName, args.dataName)
     elif args.modelName == 'sr':
         args.maxTime = 50
         if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
-            args.modelSize = 7850
             args.lrInitial = 0.1
     #     if args.dataName == 'cifar10': # 'sr', 'cifar10' 의 경우는 데이터에 비해 모델이 너무 단순해서 실험에서 제외
-    #         args.modelSize = 30730
     #         args.lrInitial = 0.01
         else:
             raise Exception(args.modelName, args.dataName)
@@ -103,16 +93,11 @@ def parseArgs():
         args.sgdEnabled = True
         args.maxTime = 500
         args.lrInitial = 0.1
-        if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
-            args.modelSize = 199210
-        else:
-            raise Exception(args.modelName, args.dataName)
     elif args.modelName == 'cnn':
         args.sgdEnabled = True
         args.flatten = False
         if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
             args.maxTime = 1000
-            args.modelSize = 369098
             args.lrInitial = 0.1
         else:
             raise Exception(args.modelName, args.dataName)
@@ -121,7 +106,6 @@ def parseArgs():
         args.flatten = False
         if args.dataName == 'cifar10':
             args.maxTime = 10000
-            args.modelSize = 519754
             args.lrInitial = 0.01
         else:
             raise Exception(args.modelName, args.dataName)
