@@ -21,18 +21,20 @@ def parseArgs():
     parser.add_argument('--nodeType',
                     help='nodeType',
                     type=str,
-                    default='one')
+                    choices=['o', 'f', 'h', 'a'],
+                    required=True)
     parser.add_argument('--edgeType',
                     help='edgeType',
                     type=str,
-                    default='one')
+                    choices=['o', 'f', 'h', 'a'],
+                    required=True)
     parser.add_argument('--opaque1',
                     help='opaque1',
-                    type=int,
+                    type=float,
                     default=-1)
     parser.add_argument('--opaque2',
                     help='opaque2',
-                    type=int,
+                    type=float,
                     default=-1)
     parser.add_argument('--numNodes',
                     help='numNodes',
@@ -66,17 +68,15 @@ def parseArgs():
                     help='lrDecayRate',
                     type=int,
                     default=0.99)
+    parser.add_argument('--numTestSamples',
+                    help='numTestSamples',
+                    type=int,
+                    default=10000)
     parser.add_argument('--batchSize',
                     help='batchSize',
                     type=int,
                     default=128)
-    parser.add_argument('--numTestIters',
-                    help='numTestIters',
-                    type=int,
-                    default=-1)
     args = parser.parse_args()
-    
-    args.numTestIters = int(10000 / args.batchSize)
     
     if args.modelName == 'svm':
         args.maxTime = 25

@@ -58,55 +58,51 @@ class AbstractModel(ABC):
     def __del__(self):
         self.sess.close()
         
-    def setParams(self, w_):
+    def setParams(self, w):
         with self.graph.as_default():
             allVars = tf.trainable_variables()
-            for var, value in zip(allVars, w_):
+            for var, value in zip(allVars, w):
                 var.load(value, self.sess)
                 
     def getParams(self):
         with self.graph.as_default():
-            w_ = self.sess.run(tf.trainable_variables())
-        return w_
+            w = self.sess.run(tf.trainable_variables())
+        return w
     
     @abstractmethod
     def createModel(self):
         pass
     
-    def local_train(self, dataBatch_i_, lr_, tau1_):
+    def local_train(self, dataBatch, lr, tau1):
         with self.graph.as_default():
             w_byTime = []
             if not self.args.sgdEnabled:
-                for _ in range(tau1_):
-                    self.sess.run(self.train_op, feed_dict={self.lr: lr_, self.x: dataBatch_i_['x'], self.y: dataBatch_i_['y']})
-                    w_ = self.sess.run(self.w, feed_dict={self.lr: lr_, self.x: dataBatch_i_['x'], self.y: dataBatch_i_['y']})
-                    w_byTime.append(w_)
-                #       loss_ = sess.run(loss, feed_dict={lr: lr_, x: dataBatch_i_['x'], y: dataBatch_i_['y']})
-                #       print(lr_, loss_)
-                    lr_ *= self.args.lrDecayRate
+                for _ in range(tau1):
+                    self.sess.run(self.train_op, feed_dict={self.lr: lr, self.x: dataBatch['x'], self.y: dataBatch['y']})
+                    w = self.sess.run(self.w, feed_dict={self.lr: lr, self.x: dataBatch['x'], self.y: dataBatch['y']})
+                    w_byTime.append(w)
+                    lr *= self.args.lrDecayRate
             else:
-                numEpochSamples = dataBatch_i_['x'].shape[0]
+                numEpochSamples = dataBatch['x'].shape[0]
                 numItersPerEpoch = int(np.ceil(numEpochSamples / self.args.batchSize).tolist())
-                for t1 in range(tau1_):
+                for t1 in range(tau1):
                     for it in range(numItersPerEpoch):
-                        (sampleBatch_x, sampleBatch_y) = next_batch(self.args.batchSize, dataBatch_i_)
-                        self.sess.run(self.train_op, feed_dict={self.lr: lr_, self.x: sampleBatch_x, self.y: sampleBatch_y})
+                        (sampleBatch_x, sampleBatch_y) = next_batch(self.args.batchSize, dataBatch)
+                        self.sess.run(self.train_op, feed_dict={self.lr: lr, self.x: sampleBatch_x, self.y: sampleBatch_y})
                     # Epoch 마다 정보 저장
-                    w_ = self.sess.run(self.w, feed_dict={self.lr: lr_, self.x: sampleBatch_x, self.y: sampleBatch_y})
-                    w_byTime.append(w_)
-                #       vs = sess.run(tf.concat([ tf.reshape(layer, [-1]) for layer in tf.get_collection(tf.GraphKeys.VARIABLES) ], axis=0))
-                #       numVars = vs.shape ; print(numVars)
-                    lr_ *= self.args.lrDecayRate
-        return w_byTime, w_
+                    w = self.sess.run(self.w, feed_dict={self.lr: lr, self.x: sampleBatch_x, self.y: sampleBatch_y})
+                    w_byTime.append(w)
+                    lr *= self.args.lrDecayRate
+        return w_byTime, w
     
     def federated_train_collect(self, w, trainData_byNid, lr, tau1):
         w_byTime_byNid = [] ; w_last_byNid = []
-        for dataBatch_i in trainData_byNid:
+        for dataBatch in trainData_byNid:
             # 모든 노드의 모델을 주어진 모델 값으로 초기화
             self.setParams(w)
             
             # Train
-            (w_byTime, w_last) = self.local_train(dataBatch_i, lr, tau1)
+            (w_byTime, w_last) = self.local_train(dataBatch, lr, tau1)
             w_byTime_byNid.append(w_byTime)
             w_last_byNid.append(w_last)
         return w_byTime_byNid, w_last_byNid
@@ -121,29 +117,36 @@ class AbstractModel(ABC):
         w_byTime = [ average_w(w_byTime_byNid[:, col], weight_byNid) for col in range(len(w_byTime_byNid[0])) ]
         return w_byTime
     
-    def evaluate(self, w_, dataBatch_):
+    def evaluate_batch(self, w, dataBatch, numSamples):
         # 모든 노드의 모델을 주어진 모델 값으로 초기화
-        self.setParams(w_)
+        self.setParams(w)
         
         with self.graph.as_default():
             # Batch Size 만큼 나눠서 평가
-            numTestIters = min(self.args.numTestIters, int(len(dataBatch_['x'])/self.args.batchSize))
-            loss_ = [] ; accs_ = [] ; idxBegin = 0 ; idxEnd = 0
-            for i in range(numTestIters):
+            minSamples = min(numSamples, len(dataBatch['x']))
+            numIters = int(minSamples / self.args.batchSize)
+            losses_ = [] ; accs_ = [] ; idxBegin = 0 ; idxEnd = 0
+            for i in range(numIters):
                 idxEnd += self.args.batchSize
-                sampleBatch_x = dataBatch_['x'][idxBegin:idxEnd]
-                sampleBatch_y = dataBatch_['y'][idxBegin:idxEnd]
-                (loss_, acc_) = self.sess.run((self.loss, self.accuracy), feed_dict={self.x: sampleBatch_x, self.y: sampleBatch_y})
+                sampleBatch_x = dataBatch['x'][idxBegin:idxEnd]
+                sampleBatch_y = dataBatch['y'][idxBegin:idxEnd]
+                loss_, acc_ = self.sess.run((self.loss, self.accuracy), feed_dict={self.x: sampleBatch_x, self.y: sampleBatch_y})
+                losses_.append(loss_)
                 accs_.append(acc_)
                 idxBegin = idxEnd
-        return np.mean(loss_), np.mean(accs_)
+        return np.mean(losses_), np.mean(accs_)
     
-    def local_gradients(self, w_, dataBatch_):
+    def evaluate(self, w, trainData_by1Nid, testData_by1Nid):
+        loss_train, acc_train = self.evaluate_batch(w, trainData_by1Nid[0], len(trainData_by1Nid[0]['x']))
+        loss_test, acc_test = self.evaluate_batch(w, testData_by1Nid[0], self.args.numTestSamples)
+        return loss_train, acc_train, loss_test, acc_test
+    
+    def local_gradients(self, w, dataBatch):
         # 모든 노드의 모델을 주어진 모델 값으로 초기화
-        self.setParams(w_)
+        self.setParams(w)
         
         with self.graph.as_default():
-            g_ = self.sess.run(self.g, feed_dict={self.x: dataBatch_['x'], self.y: dataBatch_['y']})
+            g_ = self.sess.run(self.g, feed_dict={self.x: dataBatch['x'], self.y: dataBatch['y']})
         return g_
     
     def federated_collect_gradients(self, w, nid2_Data_i):

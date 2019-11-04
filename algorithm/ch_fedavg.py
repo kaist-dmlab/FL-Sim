@@ -17,23 +17,24 @@ def groupRandomly(numNodes, numGroups):
 
 class Algorithm(AbstractAlgorithm):
     
+    def getFileName(self):
+        return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
+                + self.args.nodeType + '_' + self.args.edgeType + '_' + str(self.args.opaque1)
+    
     def __init__(self, args):
-        super(Algorithm, self).__init__(args)
+        super().__init__(args)
         
-        commonFileName = self.getCommonFileName(self.args)
-        self.fileDelta = open('logs/' + commonFileName + '_Delta.csv', 'w', newline='', buffering=1)
+        fileName = self.getFileName()
+        self.fileDelta = open('logs/' + fileName + '_Delta.csv', 'w', newline='', buffering=1)
         self.fwDelta = csv.writer(self.fileDelta, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         
     def __del__(self):
         self.fileDelta.close()
-        super(AbstractAlgorithm, self).__del__()
+        super().__del__()
         
-    def getName(self):
-        return 'CH-FedAvg'
-    
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'time', 'aggrType', 'numGroups', 'tau1', 'tau2'])
-        (_, testData_by1Nid, _, c) = self.getInitVars()
+        (trainData_by1Nid, testData_by1Nid, _, c) = self.getInitVars()
         
         # 그룹 멤버쉽 랜덤 초기화
     #    z_rand = groupRandomly(len(c.get_N()), len(c.groups))
@@ -69,10 +70,10 @@ class Algorithm(AbstractAlgorithm):
                         aggrType = 'Global'
                     else:
                         aggrType = ''
-                    (loss, accuracy) = self.model.evaluate(w_byTime[t1], testData_by1Nid[0])
+                    (loss, _, _, acc) = self.model.evaluate(w_byTime[t1], trainData_by1Nid, testData_by1Nid)
                     print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f\ttime=%.4f\taggrType=%s\tnumGroups=%d\ttau1=%d\ttau2=%d'
-                          % (t, loss, accuracy, d_sum, aggrType, len(c.groups), tau1, tau2))
-                    self.fwEpoch.writerow([t, loss, accuracy, d_sum, aggrType, len(c.groups), tau1, tau2])
+                          % (t, loss, acc, d_sum, aggrType, len(c.groups), tau1, tau2))
+                    self.fwEpoch.writerow([t, loss, acc, d_sum, aggrType, len(c.groups), tau1, tau2])
 
                     lr *= self.args.lrDecayRate
     #                 if t >= self.args.maxEpoch: break

@@ -2,8 +2,8 @@ from algorithm.abc import AbstractAlgorithm
 
 class Algorithm(AbstractAlgorithm):
     
-    def getName(self):
-        return 'CGD'
+    def getFileName(self):
+        return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName
     
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy'])
@@ -15,7 +15,7 @@ class Algorithm(AbstractAlgorithm):
         for t in range(1, self.args.maxEpoch):
             (w_byTime, _) = self.model.federated_train(w, trainData_by1Nid, lr, 1, [1])
             w = w_byTime[0]
-            (loss, accuracy) = self.model.evaluate(w, testData_by1Nid[0])
-            print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f' % (t, loss, accuracy))
-            self.fwEpoch.writerow([t, loss, accuracy])
+            (loss, _, _, acc) = self.model.evaluate(w, trainData_by1Nid, testData_by1Nid)
+            print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f' % (t, loss, acc))
+            self.fwEpoch.writerow([t, loss, acc])
             lr *= self.args.lrDecayRate

@@ -11,12 +11,12 @@ import fl_struct
 
 PRINT_INTERVAL = 0.5
 
-def printTimedLogs(commonFileName):
-    fileEpoch = open('logs/' + commonFileName + '_epoch.csv', 'r')
+def printTimedLogs(fileName):
+    fileEpoch = open('logs/' + fileName + '_epoch.csv', 'r')
     fileEpoch.readline() # 세 줄 제외
     fileEpoch.readline()
     fileEpoch.readline()
-    fileTime = open('logs/' + commonFileName + '_time.csv', 'w', newline='', buffering=1)
+    fileTime = open('logs/' + fileName + '_time.csv', 'w', newline='', buffering=1)
     fwTime = csv.writer(fileTime, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
     fwTime.writerow(['time', 'loss', 'accuracy', 'epoch', 'aggrType'])
     refDict = {}
@@ -50,8 +50,9 @@ def printTimedLogs(commonFileName):
     
 class AbstractAlgorithm(ABC):
     
-    def getCommonFileName(self, args):
-        return str(args.numNodes) + '_' + str(args.numEdges) + '_' + args.modelName + '_' + args.dataName + '_' + self.getName()
+    @abstractmethod
+    def getFileName(self):
+        pass
     
     def __init__(self, args):
         self.args = args
@@ -69,7 +70,7 @@ class AbstractAlgorithm(ABC):
         (trainData_byNid, train_z) = fl_data.groupByEdge(self.args.modelName, self.args.dataName, trainData,
                                                           self.args.nodeType, self.args.edgeType, self.args.numNodes, self.args.numEdges, self.args.flatten)
         (trainData_byNid_iid, train_z_iid) = fl_data.groupByEdge(self.args.modelName, self.args.dataName, trainData,
-                                                          self.args.nodeType, 'all', self.args.numNodes, self.args.numEdges, self.args.flatten)
+                                                          self.args.nodeType, 'a', self.args.numNodes, self.args.numEdges, self.args.flatten)
         print('Shape of trainData on 1st node:', trainData_byNid[0]['x'].shape, trainData_byNid[0]['y'].shape)
         
         modelPackagePath = 'model.' + self.args.modelName
@@ -77,13 +78,14 @@ class AbstractAlgorithm(ABC):
         Model = getattr(modelModule, 'Model')
         self.model = Model(self.args, trainData_byNid[0]['x'].shape)
         
-        commonFileName = self.getCommonFileName(self.args)
-        print(commonFileName)
-        self.fileEpoch = open('logs/' + commonFileName + '_epoch.csv', 'w', newline='', buffering=1)
+        fileName = self.getFileName()
+        print(fileName)
+        self.fileEpoch = open('logs/' + fileName + '_epoch.csv', 'w', newline='', buffering=1)
         self.fwEpoch = csv.writer(self.fileEpoch, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        self.fwEpoch.writerow([ 'MAX_TIME', 'SGD_ENABLED', 'MODEL_SIZE', 'LR_INITIAL', 'LR_DECAY_RATE', 'BATCH_SIZE', 'NUM_TEST_ITERS' ])
-        self.fwEpoch.writerow([ args.maxTime, args.sgdEnabled, self.model.size, \
-                     args.lrInitial, args.lrDecayRate, args.batchSize, args.numTestIters ])
+        self.fwEpoch.writerow([ 'NUM_NODES', 'NUM_EDGES', 'MAX_TIME', 'SGD_ENABLED', 'MODEL_SIZE', \
+                               'LR_INITIAL', 'LR_DECAY_RATE', 'NUM_TEST_SAMPLES', 'BATCH_SIZE' ])
+        self.fwEpoch.writerow([ args.numNodes, args.numEdges, args.maxTime, args.sgdEnabled, self.model.size, \
+                     args.lrInitial, args.lrDecayRate, args.numTestSamples, args.batchSize ])
         
         ft = fl_struct.FatTree(self.args.numNodes, self.args.numEdges)
         self.c = fl_struct.Cloud(ft, trainData_byNid, self.args.numEdges, self.model.size)
@@ -94,15 +96,11 @@ class AbstractAlgorithm(ABC):
     def __del__(self):
         print()
         self.fileEpoch.close()
-        commonFileName = self.getCommonFileName(self.args)
-        printTimedLogs(commonFileName)
+        fileName = self.getFileName()
+        printTimedLogs(fileName)
         
     def getInitVars(self):
         return self.trainData_by1Nid, self.testData_by1Nid, self.c, self.c2
-        
-    @abstractmethod
-    def getName(self):
-        pass
     
     @abstractmethod
     def run(self):

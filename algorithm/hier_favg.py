@@ -2,12 +2,14 @@ from algorithm.abc import AbstractAlgorithm
 
 class Algorithm(AbstractAlgorithm):
     
-    def getName(self):
-        return 'HierFAVG'
+    def getFileName(self):
+        return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
+                + self.args.nodeType + '_' + self.args.edgeType + '_' + str(self.args.opaque1) + '_' \
+                + str(self.args.opaque2)
     
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'time', 'aggrType'])
-        (_, testData_by1Nid, c, _) = self.getInitVars()
+        (trainData_by1Nid, testData_by1Nid, c, _) = self.getInitVars()
         
         lr = self.args.lrInitial
         input_w_ks = [ self.model.getParams() for _ in c.groups ]
@@ -38,9 +40,9 @@ class Algorithm(AbstractAlgorithm):
                         aggrType = 'Global'
                     else:
                         aggrType = ''
-                    (loss, accuracy) = self.model.evaluate(w_byTime[t1], testData_by1Nid[0])
-                    print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f\ttime=%.4f\taggrType=%s' % (t, loss, accuracy, d_sum, aggrType))
-                    self.fwEpoch.writerow([t, loss, accuracy, d_sum, aggrType])
+                    (loss, _, _, acc) = self.model.evaluate(w_byTime[t1], trainData_by1Nid, testData_by1Nid)
+                    print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f\ttime=%.4f\taggrType=%s' % (t, loss, acc, d_sum, aggrType))
+                    self.fwEpoch.writerow([t, loss, acc, d_sum, aggrType])
                     
                     lr *= self.args.lrDecayRate
                     if d_sum >= self.args.maxTime: break;

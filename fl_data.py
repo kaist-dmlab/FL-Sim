@@ -44,7 +44,7 @@ def groupByNode(data_by1Nid, nodeType, numNodes):
     if not(numNodes % numClasses == 0): raise Exception(str(numNodes) + ' ' + str(numClasses))
     data_byClass = groupByClass(data_by1Nid)
     data_byNid = []
-    if nodeType == 'one':
+    if nodeType == 'o':
         numNodesPerClass = int(numNodes / numClasses)
         for c in range(numClasses):
             curNumSamples = len(data_byClass[c]['y'])
@@ -55,26 +55,49 @@ def groupByNode(data_by1Nid, nodeType, numNodes):
                 data_byNid.append( { 'x': np.array(data_byClass[c]['x'][idxStart:idxEnd], dtype=np.float32),
                                      'y': np.array(data_byClass[c]['y'][idxStart:idxEnd], dtype=np.int32) } )
                 idxStart += p
-    elif nodeType == 'half':
-        numNodesPerClassSet = int(numNodes / 2)
-        for cs in range(2):
-            curdata_byNid = []
-            for c_ in range(int(numClasses / 2)):
-                c = cs * int(numClasses / 2) + c_
+    elif nodeType == 'f':
+        numClassSet = 5
+        numNodesPerClassSet = int(numNodes / numClassSet)
+        numClassesPerClassSet = int(numClasses / numClassSet)
+        for cs in range(numClassSet):
+            curData_byNid = []
+            for c_ in range(numClassesPerClassSet):
+                c = cs * numClassesPerClassSet + c_
                 curNumSamples = len(data_byClass[c]['y'])
                 ps = partitionSumRandomly(curNumSamples, numNodesPerClassSet)
                 idxStart = 0 ; idxEnd = 0
                 for i_ in range(numNodesPerClassSet):
                     idxEnd += ps[i_]
-                    if len(curdata_byNid) < numNodesPerClassSet:
-                        curdata_byNid.append( { 'x': np.array(data_byClass[c]['x'][idxStart:idxEnd], dtype=np.float32),
+                    if len(curData_byNid) < numNodesPerClassSet:
+                        curData_byNid.append( { 'x': np.array(data_byClass[c]['x'][idxStart:idxEnd], dtype=np.float32),
                                                 'y': np.array(data_byClass[c]['y'][idxStart:idxEnd], dtype=np.int32) } )
                     else:
-                        curdata_byNid[i_]['x'] = np.append(curdata_byNid[i_]['x'], data_byClass[c]['x'][idxStart:idxEnd], axis=0)
-                        curdata_byNid[i_]['y'] = np.append(curdata_byNid[i_]['y'], data_byClass[c]['y'][idxStart:idxEnd])
+                        curData_byNid[i_]['x'] = np.append(curData_byNid[i_]['x'], data_byClass[c]['x'][idxStart:idxEnd], axis=0)
+                        curData_byNid[i_]['y'] = np.append(curData_byNid[i_]['y'], data_byClass[c]['y'][idxStart:idxEnd])
                     idxStart += ps[i_]
-            data_byNid += curdata_byNid
-    elif nodeType == 'all':
+            data_byNid += curData_byNid
+    elif nodeType == 'h':
+        numClassSet = 2
+        numNodesPerClassSet = int(numNodes / numClassSet)
+        numClassesPerClassSet = int(numClasses / numClassSet)
+        for cs in range(numClassSet):
+            curData_byNid = []
+            for c_ in range(numClassesPerClassSet):
+                c = cs * numClassesPerClassSet + c_
+                curNumSamples = len(data_byClass[c]['y'])
+                ps = partitionSumRandomly(curNumSamples, numNodesPerClassSet)
+                idxStart = 0 ; idxEnd = 0
+                for i_ in range(numNodesPerClassSet):
+                    idxEnd += ps[i_]
+                    if len(curData_byNid) < numNodesPerClassSet:
+                        curData_byNid.append( { 'x': np.array(data_byClass[c]['x'][idxStart:idxEnd], dtype=np.float32),
+                                                'y': np.array(data_byClass[c]['y'][idxStart:idxEnd], dtype=np.int32) } )
+                    else:
+                        curData_byNid[i_]['x'] = np.append(curData_byNid[i_]['x'], data_byClass[c]['x'][idxStart:idxEnd], axis=0)
+                        curData_byNid[i_]['y'] = np.append(curData_byNid[i_]['y'], data_byClass[c]['y'][idxStart:idxEnd])
+                    idxStart += ps[i_]
+            data_byNid += curData_byNid
+    elif nodeType == 'a':
         for c in range(numClasses):
             curNumSamples = len(data_byClass[c]['y'])
             ps = partitionSumRandomly(curNumSamples, numNodes)
@@ -100,18 +123,35 @@ def groupByEdge(modelName, dataName, data, nodeType, edgeType, numNodes, numEdge
     if not(numNodesPerEdge % numClasses == 0): raise Exception(str(numNodesPerEdge) + ' ' + str(numClasses))
     numNodesPerClass = int(numNodes / numClasses)
     nids_byEid = []
-    if (nodeType == 'one' and edgeType == 'one') or (nodeType == 'half' and edgeType == 'half') \
-        or (nodeType == 'all' and edgeType == 'all'):
+    if (nodeType == 'o' and edgeType == 'o') \
+        or (nodeType == 'f' and edgeType == 'f') \
+        or (nodeType == 'h' and edgeType == 'h') \
+        or (nodeType == 'a' and edgeType == 'a'):
         nids_byEid = [ [ k * numNodesPerEdge + i_ for i_ in range(numNodesPerEdge) ] for k in range(numEdges) ]
-    elif nodeType == 'one' and edgeType == 'half':
-        for k in range(2):
+    elif nodeType == 'o' and edgeType == 'f':
+        numClassSet = 5
+        for k in range(numClassSet):
             for j in range(numNodesPerClass):
-                nids_byEid.append([ k * int(numNodes / 2) + j + i * numNodesPerClass for i in range(int(numClasses / 2)) ])
+                nids_byEid.append([ k * int(numNodes / numClassSet) + j + i * numNodesPerClass for i in range(int(numClasses / numClassSet)) ])
         nids_byEid = np.array(nids_byEid).reshape((numEdges, numNodesPerEdge)).tolist()
-    elif (nodeType == 'one' and edgeType == 'all') or (nodeType == 'half' and edgeType == 'all'):
+    elif nodeType == 'o' and edgeType == 'h':
+        numClassSet = 2
+        for k in range(numClassSet):
+            for j in range(numNodesPerClass):
+                nids_byEid.append([ k * int(numNodes / numClassSet) + j + i * numNodesPerClass for i in range(int(numClasses / numClassSet)) ])
+        nids_byEid = np.array(nids_byEid).reshape((numEdges, numNodesPerEdge)).tolist()
+    elif nodeType == 'f' and edgeType == 'h':
+        numClassSet = 2
+        for k in range(numClassSet):
+            for j in range(numNodesPerClass):
+                nids_byEid.append([ k * int(numNodes / numClassSet) + j + i * numNodesPerClass for i in range(int(numClasses / numClassSet)) ])
+        nids_byEid = np.array(nids_byEid).reshape((numEdges, numNodesPerEdge)).tolist()
+    elif (nodeType == 'o' and edgeType == 'a') \
+        or (nodeType == 'f' and edgeType == 'a') \
+        or (nodeType == 'h' and edgeType == 'a'):
         nids_byEid = [ [ j + i * numEdges for i in range(numNodesPerEdge) ] for j in range(numEdges) ]
     else:
-        raise Exception(edgeType)
+        raise Exception(nodeType, edgeType)
     data_byNid = groupByNode(data_by1Nid, nodeType, numNodes)
     data_byNid = np.array([ data_byNid[nid] for nids in nids_byEid for nid in nids ]) # Node 오름차순으로 데이터 정렬
     z = [ eid for eid in range(numEdges) for _ in range(numNodesPerEdge) ]
