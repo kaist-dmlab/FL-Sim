@@ -3,21 +3,22 @@ from algorithm.abc import AbstractAlgorithm
 class Algorithm(AbstractAlgorithm):
     
     def getFileName(self):
+        tau1 = int(self.args.opaque1)
+        tau2 = int(self.args.opaque2)
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + self.args.nodeType + '_' + self.args.edgeType + '_' + str(self.args.opaque1) + '_' \
-                + str(self.args.opaque2)
+                + self.args.nodeType + self.args.edgeType + '_' + str(tau1) + '_' + str(tau2)
     
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'time', 'aggrType'])
-        (trainData_by1Nid, testData_by1Nid, c, _) = self.getInitVars()
+        (trainData_by1Nid, testData_by1Nid, c) = self.getInitVars()
         
         lr = self.args.lrInitial
         input_w_ks = [ self.model.getParams() for _ in c.groups ]
         d_global = c.get_d_global(True) ; d_group = c.get_d_group(True) ; d_sum = 0
         
     #     for t3 in range(int(self.args.maxEpoch/(tau1*tau2))):
-        tau1 = self.args.opaque1
-        tau2 = self.args.opaque2
+        tau1 = int(self.args.opaque1)
+        tau2 = int(self.args.opaque2)
         t3 = 0
         while True:
             for t2 in range(tau2):

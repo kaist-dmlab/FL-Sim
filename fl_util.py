@@ -6,7 +6,7 @@ def parseArgs():
     parser.add_argument('--modelName',
                     help='modelName',
                     type=str,
-                    choices=['svm', 'sr', '2nn', 'cnn', 'cnn_cifar10'],
+                    choices=['svm', 'sr', '2nn', 'cnn', 'resnet'],
                     required=True)
     parser.add_argument('--dataName',
                     help='dataName',
@@ -16,7 +16,7 @@ def parseArgs():
     parser.add_argument('--algName',
                     help='algName',
                     type=str,
-                    choices=['cgd', 'fedavg', 'hier_favg', 'ch_fedavg'],
+                    choices=['cgd', 'fedavg', 'hier-favg', 'ch-fedavg'],
                     required=True)
     parser.add_argument('--nodeType',
                     help='nodeType',
@@ -62,8 +62,8 @@ def parseArgs():
                     default=-1)
     parser.add_argument('--lrInitial',
                     help='lrInitial',
-                    type=int,
-                    default=-1)
+                    type=float,
+                    default=0.1)
     parser.add_argument('--lrDecayRate',
                     help='lrDecayRate',
                     type=int,
@@ -83,31 +83,24 @@ def parseArgs():
         args.lrInitial = 0.01
     elif args.modelName == 'sr':
         args.maxTime = 50
-        if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
-            args.lrInitial = 0.1
-    #     if args.dataName == 'cifar10': # 'sr', 'cifar10' 의 경우는 데이터에 비해 모델이 너무 단순해서 실험에서 제외
-    #         args.lrInitial = 0.01
-        else:
+        if args.dataName == 'cifar10': # sr, cifar10 의 경우는 데이터에 비해 모델이 너무 단순해서 실험에서 제외
             raise Exception(args.modelName, args.dataName)
     elif args.modelName == '2nn':
         args.sgdEnabled = True
         args.maxTime = 500
-        args.lrInitial = 0.1
     elif args.modelName == 'cnn':
         args.sgdEnabled = True
         args.flatten = False
         if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
             args.maxTime = 1000
-            args.lrInitial = 0.1
         else:
             raise Exception(args.modelName, args.dataName)
-    elif args.modelName == 'cnn_cifar10':
+    elif args.modelName == 'resnet':
         args.sgdEnabled = True
         args.flatten = False
-        if args.dataName == 'cifar10':
-            args.maxTime = 10000
-            args.lrInitial = 0.01
-        else:
+        args.maxTime = 10000
+        args.batchSize = 256
+        if args.dataName != 'cifar10': # 'resnet' 은 cifar10 만 지원
             raise Exception(args.modelName, args.dataName)
     else:
         raise Exception(args.modelName)

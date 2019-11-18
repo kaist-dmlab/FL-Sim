@@ -12,6 +12,6 @@ class Model(AbstractModel):
         
         y_prob = tf.nn.softmax(tf.matmul(self.x, W) + b)
         loss = -tf.reduce_mean(tf.reduce_sum(tf.one_hot(self.y, 10) * tf.math.log(y_prob), axis=[1]))
-        w = [W, b]
+#         w = [W, b]
         y_hat = tf.cast(tf.argmax(y_prob, 1), tf.int32)
-        return loss, w, y_hat
+        return loss, y_hat

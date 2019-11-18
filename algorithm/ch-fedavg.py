@@ -18,10 +18,12 @@ def groupRandomly(numNodes, numGroups):
 class Algorithm(AbstractAlgorithm):
     
     def getFileName(self):
+        d_budget = self.args.opaque1
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + self.args.nodeType + '_' + self.args.edgeType + '_' + str(self.args.opaque1)
+                + self.args.nodeType + self.args.edgeType + '_' + str(d_budget)
     
     def __init__(self, args):
+        args.edgeType = 'a' # 무조건 처음 edgeType 을 all 로 고정
         super().__init__(args)
         
         fileName = self.getFileName()
@@ -34,7 +36,7 @@ class Algorithm(AbstractAlgorithm):
         
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'time', 'aggrType', 'numGroups', 'tau1', 'tau2'])
-        (trainData_by1Nid, testData_by1Nid, _, c) = self.getInitVars()
+        (trainData_by1Nid, testData_by1Nid, c) = self.getInitVars()
         
         # 그룹 멤버쉽 랜덤 초기화
     #    z_rand = groupRandomly(len(c.get_N()), len(c.groups))
@@ -122,6 +124,7 @@ class Algorithm(AbstractAlgorithm):
         d_group = c.get_d_group(True)
         d_global = c.get_d_global(True)
         tau1 = 1
+#         tau2 = int(d_budget)
         if d_group < d_global:
             tau2 = max( int((d_budget + d_group - d_global) / d_group), 1 )
         else:

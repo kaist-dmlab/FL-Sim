@@ -45,10 +45,11 @@ class AbstractModel(ABC):
             x_ph_shape = [None] + [ x_shape[j] for j in range(1, len(x_shape)) ]
             self.x = tf.placeholder(name='x', shape=x_ph_shape, dtype=tf.float32)
             self.y = tf.placeholder(name='y', shape=[None], dtype=tf.int32)
-            self.lr = tf.placeholder(name='lr', shape=[], dtype=tf.float32)
-            self.loss, self.w, self.y_hat = self.createModel()
+            self.lr = tf.placeholder(name='lr', dtype=tf.float32)
+            self.loss, self.y_hat = self.createModel()
+            self.w = tf.trainable_variables()
             self.g = tf.gradients(self.loss, self.w)
-            self.train_op = tf.train.GradientDescentOptimizer(self.lr).minimize(self.loss)
+            self.train_op = self.getOptimizer()
             self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_hat, self.y), tf.float32))
         self.sess = tf.Session(config=config, graph=self.graph)
         self.size = graph_size(self.graph)
@@ -73,13 +74,22 @@ class AbstractModel(ABC):
     def createModel(self):
         pass
     
+    def getOptimizer(self):
+        return tf.train.GradientDescentOptimizer(self.lr).minimize(self.loss)
+    
+    def augment(self, x):
+        return x
+    
     def local_train(self, dataBatch, lr, tau1):
         with self.graph.as_default():
             w_byTime = []
             if not self.args.sgdEnabled:
                 for _ in range(tau1):
-                    self.sess.run(self.train_op, feed_dict={self.lr: lr, self.x: dataBatch['x'], self.y: dataBatch['y']})
-                    w = self.sess.run(self.w, feed_dict={self.lr: lr, self.x: dataBatch['x'], self.y: dataBatch['y']})
+                    dataBatch_x = dataBatch['x']
+                    dataBatch_y = dataBatch['y']
+                    dataBatch_x = self.augment(dataBatch_x)
+                    self.sess.run(self.train_op, feed_dict={self.lr: lr, self.x: dataBatch_x, self.y: dataBatch_y})
+                    w = self.sess.run(self.w, feed_dict={self.lr: lr, self.x: dataBatch_x, self.y: dataBatch_y})
                     w_byTime.append(w)
                     lr *= self.args.lrDecayRate
             else:
@@ -88,6 +98,7 @@ class AbstractModel(ABC):
                 for t1 in range(tau1):
                     for it in range(numItersPerEpoch):
                         (sampleBatch_x, sampleBatch_y) = next_batch(self.args.batchSize, dataBatch)
+                        sampleBatch_x = self.augment(sampleBatch_x)
                         self.sess.run(self.train_op, feed_dict={self.lr: lr, self.x: sampleBatch_x, self.y: sampleBatch_y})
                     # Epoch 마다 정보 저장
                     w = self.sess.run(self.w, feed_dict={self.lr: lr, self.x: sampleBatch_x, self.y: sampleBatch_y})

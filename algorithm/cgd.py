@@ -7,7 +7,7 @@ class Algorithm(AbstractAlgorithm):
     
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy'])
-        (trainData_by1Nid, testData_by1Nid, _, _) = self.getInitVars()
+        (trainData_by1Nid, testData_by1Nid, _) = self.getInitVars()
         
         lr = self.args.lrInitial
         w = self.model.getParams()

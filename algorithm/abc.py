@@ -69,8 +69,6 @@ class AbstractAlgorithm(ABC):
         self.testData_by1Nid = fl_data.preprocess(self.args.modelName, self.args.dataName, testData, self.args.flatten)
         (trainData_byNid, train_z) = fl_data.groupByEdge(self.args.modelName, self.args.dataName, trainData,
                                                           self.args.nodeType, self.args.edgeType, self.args.numNodes, self.args.numEdges, self.args.flatten)
-        (trainData_byNid_iid, train_z_iid) = fl_data.groupByEdge(self.args.modelName, self.args.dataName, trainData,
-                                                          self.args.nodeType, 'a', self.args.numNodes, self.args.numEdges, self.args.flatten)
         print('Shape of trainData on 1st node:', trainData_byNid[0]['x'].shape, trainData_byNid[0]['y'].shape)
         
         modelPackagePath = 'model.' + self.args.modelName
@@ -90,8 +88,6 @@ class AbstractAlgorithm(ABC):
         ft = fl_struct.FatTree(self.args.numNodes, self.args.numEdges)
         self.c = fl_struct.Cloud(ft, trainData_byNid, self.args.numEdges, self.model.size)
         self.c.digest(train_z)
-        self.c2 = fl_struct.Cloud(ft, trainData_byNid_iid, self.args.numEdges, self.model.size)
-        self.c2.digest(train_z_iid)
         
     def __del__(self):
         print()
@@ -100,7 +96,7 @@ class AbstractAlgorithm(ABC):
         printTimedLogs(fileName)
         
     def getInitVars(self):
-        return self.trainData_by1Nid, self.testData_by1Nid, self.c, self.c2
+        return self.trainData_by1Nid, self.testData_by1Nid, self.c
     
     @abstractmethod
     def run(self):

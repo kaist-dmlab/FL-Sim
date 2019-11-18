@@ -36,7 +36,7 @@ class Model(AbstractModel):
         y_onehot = tf.one_hot(self.y, 10)
         logits = self.get_logits_cnn(x_exp, W_conv1, b_conv1, W_conv2, b_conv2, W_fc1, b_fc1, W_fc2, b_fc2)
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_onehot, logits=logits))
-        w = [W_conv1, b_conv1, W_conv2, b_conv2, W_fc1, b_fc1, W_fc2, b_fc2]
+#         w = [W_conv1, b_conv1, W_conv2, b_conv2, W_fc1, b_fc1, W_fc2, b_fc2]
         y_prob = tf.nn.softmax(logits)
         y_hat = tf.cast(tf.argmax(y_prob, 1), tf.int32)
-        return loss, w, y_hat
+        return loss, y_hat
