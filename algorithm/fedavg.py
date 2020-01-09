@@ -23,7 +23,7 @@ class Algorithm(AbstractAlgorithm):
         tau1 = int(self.args.opaque1)
         t2 = 0
         while True:
-            (w_byTime, _) = self.model.federated_train(w, c.get_Data_is(), lr, tau1, c.get_D_is())
+            (w_byTime, _) = self.model.federated_train(w, c.get_D_is(), lr, tau1, c.get_p_is())
             w = w_byTime[-1]
             for t1 in range(tau1):
                 t = t2*tau1 + t1 + 1

@@ -1,12 +1,15 @@
 import argparse
 import numpy as np
 
+from leaf.models.utils import model_utils
+import pickle
+
 def parseArgs():
     parser = argparse.ArgumentParser()
     parser.add_argument('--modelName',
                     help='modelName',
                     type=str,
-                    choices=['svm', 'sr', '2nn', 'cnn', 'resnet'],
+                    choices=['sr', '1nn', '2nn', 'cnn'], # svm, resnet 제외
                     required=True)
     parser.add_argument('--dataName',
                     help='dataName',
@@ -20,13 +23,13 @@ def parseArgs():
                     required=True)
     parser.add_argument('--nodeType',
                     help='nodeType',
-                    type=str,
-                    choices=['o', 'f', 'h', 'a'],
+                    type=int,
+                    choices=[2, 4, 6, 8],
                     required=True)
     parser.add_argument('--edgeType',
                     help='edgeType',
-                    type=str,
-                    choices=['o', 'f', 'h', 'a'],
+                    type=int,
+                    choices=[2, 4, 6, 8],
                     required=True)
     parser.add_argument('--opaque1',
                     help='opaque1',
@@ -44,14 +47,14 @@ def parseArgs():
                     help='numEdges',
                     type=int,
                     default=10)
+    parser.add_argument('--numGroups',
+                    help='numGroups',
+                    type=int,
+                    default=10)
     parser.add_argument('--sgdEnabled',
                     help='sgdEnabled',
                     type=bool,
                     default=False)
-    parser.add_argument('--flatten',
-                    help='flatten',
-                    type=bool,
-                    default=True)
     parser.add_argument('--maxEpoch',
                     help='maxEpoch',
                     type=int,
@@ -76,6 +79,10 @@ def parseArgs():
                     help='batchSize',
                     type=int,
                     default=128)
+    parser.add_argument('--isValidation',
+                    help='isValidation',
+                    type=bool,
+                    default=False)
     args = parser.parse_args()
     
     if args.modelName == 'svm':
@@ -85,19 +92,20 @@ def parseArgs():
         args.maxTime = 50
         if args.dataName == 'cifar10': # sr, cifar10 의 경우는 데이터에 비해 모델이 너무 단순해서 실험에서 제외
             raise Exception(args.modelName, args.dataName)
+    elif args.modelName == '1nn':
+        args.sgdEnabled = True
+        args.maxTime = 250
     elif args.modelName == '2nn':
         args.sgdEnabled = True
         args.maxTime = 500
     elif args.modelName == 'cnn':
         args.sgdEnabled = True
-        args.flatten = False
         if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
             args.maxTime = 1000
         else:
             raise Exception(args.modelName, args.dataName)
     elif args.modelName == 'resnet':
         args.sgdEnabled = True
-        args.flatten = False
         args.maxTime = 10000
         args.batchSize = 256
         if args.dataName != 'cifar10': # 'resnet' 은 cifar10 만 지원
@@ -112,3 +120,15 @@ def to_nids_byGid(z):
         if not(gid in gids): return None
     nids_byGid = [ [ nid for nid, gid in enumerate(z) if gid == gid_ ] for gid_ in gids ]
     return nids_byGid
+
+def serialize(dirPath, obj):
+    with open(dirPath, 'wb') as handle:
+        pickle.dump(obj, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    
+def deserialize(dirPath):
+    with open(dirPath, 'rb') as handle:
+        obj = pickle.load(handle)
+        return obj
+    
+def readJsonDir(dirPath):
+    return model_utils.read_dir(dirPath)

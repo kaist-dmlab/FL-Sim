@@ -26,11 +26,11 @@ class Algorithm(AbstractAlgorithm):
                 output_w_ks = []
                 for k, g in enumerate(c.groups): # Group Aggregation
                     w_k = input_w_ks[k]
-                    (w_k_byTime, _) = self.model.federated_train(w_k, g.get_Data_k_is(), lr, tau1, g.get_D_k_is())
+                    (w_k_byTime, _) = self.model.federated_train(w_k, g.get_D_k_is(), lr, tau1, g.get_p_k_is())
                     w_k_byTime_byGid.append(w_k_byTime)
                     output_w_ks.append(w_k_byTime[-1])
                 input_w_ks = output_w_ks
-                w_byTime = self.model.federated_aggregate(w_k_byTime_byGid, c.get_D_ks()) # Global Aggregation
+                w_byTime = self.model.federated_aggregate(w_k_byTime_byGid, c.get_p_ks()) # Global Aggregation
                 for t1 in range(tau1):
                     t = t3*tau1*tau2 + t2*tau1 + t1 + 1
                     if t % tau1 == 0 and not(t % (tau1*tau2)) == 0:
@@ -55,7 +55,7 @@ class Algorithm(AbstractAlgorithm):
             input_w_ks = [ w for _ in c.groups ]
             
             # 실험 출력용 Delta 계산
-    #        (g_is__w, nid2_g_i__w) = self.model.federated_collect_gradients(w, c.get_nid2_Data_i())
-    #        g__w = np.average(g_is__w, axis=0, weights=c.get_D_is())
+    #        (g_is__w, nid2_g_i__w) = self.model.federated_collect_gradients(w, c.get_nid2_D_i())
+    #        g__w = np.average(g_is__w, axis=0, weights=c.get_p_is())
     #        Delta = c.get_Delta(nid2_g_i__w, g__w)
     #        print(Delta)

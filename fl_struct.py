@@ -9,6 +9,7 @@ import subprocess
 import os
 
 import fl_util
+import fl_struct
 
 # LINKSPEED = '10Mbps', SIM_SIM_DATA_SIZE = 40000 도 비슷한 결과라서 시뮬레이션 빨리 하기 위해 SIM_DATA_SIZE 를 낮춤
 # 시뮬레이션은 SIM_DATA_SIZE 크기가 클 수록 패킷 수가 늘어나서 오래걸림
@@ -203,41 +204,54 @@ class FatTree:
         return self.dist[nid1][nid2]
     
 class Cloud:
-    def __init__(self, ft, data_byNid, numGroups, modelSize=-1):
+    def __init__(self, ft, D_byNid, numGroups, modelSize=-1):
         self.ft = ft
-        self.data_byNid = data_byNid
+        self.D_byNid = D_byNid
         self.modelSize = modelSize
-        self.groups = [ Group(k, ft, data_byNid, modelSize) for k in range(numGroups) ]
+        self.groups = [ Group(k, ft, D_byNid, modelSize) for k in range(numGroups) ]
         self.ps_nid = 0 # 모든 노드와의 거리가 같으므로 처음 노드로 설정
         self.ready = False
+    
+    def __eq__(self, other):
+        if self.modelSize != other.modelSize:
+            raise Exception(str(self.modelSize), str(other.modelSize))
+        if self.groups != other.groups:
+            raise Exception(str(self.groups), str(other.groups))
+        if self.ps_nid != other.ps_nid:
+            raise Exception(str(self.ps_nid), str(other.ps_nid))
+        if self.ready != other.ready:
+            raise Exception(str(self.ready), str(other.ready))
+        return True
+    
+    def clone(self):
+        c_cloned = fl_struct.Cloud(self.ft, self.D_byNid, len(self.groups), self.modelSize)
+        c_cloned.digest(self.z)
+        return c_cloned
         
     def get_N(self): # 전체 노드 집합
         if self.ready == False: raise Exception
         return self.N
     
-    def get_D(self): # 전체 데이터 크기
+    def get_p_ks(self): # 그룹 별 데이터 크기 집합
         if self.ready == False: raise Exception
-        return self.D
+        return self.p_ks
+        
+    def set_p_is(self, p_is):
+        for g in self.groups:
+            g.set_p_is(p_is)
+        self.ready = False
     
-    def get_D_ks(self): # 그룹 별 데이터 크기 집합
+    def get_p_is(self):
         if self.ready == False: raise Exception
-        return self.D_ks
+        return list(self.nid2_p_i.values()) # 순서가 중요하지 않을 때 list 반환
     
-    def get_nid2_D_i(self): # 전체 노드 별 데이터 크기 집합
+    def get_nid2_D_i(self): # 전체 노드 별 데이터 집합
         if self.ready == False: raise Exception
         return self.nid2_D_i # 순서가 중요할 때 dict 반환
     
     def get_D_is(self):
         if self.ready == False: raise Exception
         return list(self.nid2_D_i.values()) # 순서가 중요하지 않을 때 list 반환
-    
-    def get_nid2_Data_i(self): # 전체 노드 별 데이터 집합
-        if self.ready == False: raise Exception
-        return self.nid2_Data_i # 순서가 중요할 때 dict 반환
-    
-    def get_Data_is(self):
-        if self.ready == False: raise Exception
-        return list(self.nid2_Data_i.values()) # 순서가 중요하지 않을 때 list 반환
     
     def get_d_global(self, edgeCombineEnabled):
         if self.ready == False: raise Exception
@@ -253,7 +267,7 @@ class Cloud:
     def get_Delta(self, nid2_g_i__w, g__w):
         if self.ready == False: raise Exception
         Delta_ks = [ g.get_Delta_k(nid2_g_i__w, g__w) for g in self.groups ]
-        Delta = np.average(Delta_ks, weights=self.get_D_ks())
+        Delta = np.average(Delta_ks, weights=self.get_p_ks())
         return Delta
         
     def digest(self, z, debugging=False):
@@ -270,26 +284,44 @@ class Cloud:
             # Digest
             self.N = []
             self.D = 0
-            self.D_ks = []
+            self.p_ks = []
+            self.nid2_p_i = {}
             self.nid2_D_i = {}
-            self.nid2_Data_i = {}
             for g in self.groups:
                 g.digest(debugging)
                 self.N += g.get_N_k()
-                self.D += g.get_D_k()
-                self.D_ks.append(g.get_D_k())
+                self.D += g.get_p_k()
+                self.p_ks.append(g.get_p_k())
+                self.nid2_p_i.update(g.get_nid2_p_k_i()) # p_is 로 변환
                 self.nid2_D_i.update(g.get_nid2_D_k_i())
-                self.nid2_Data_i.update(g.get_nid2_Data_k_i())
             self.ready = True
             return True
         
 class Group:
-    def __init__(self, k, ft, data_byNid, modelSize):
+    def __init__(self, k, ft, D_byNid, modelSize):
         self.k = k
         self.ft = ft
-        self.data_byNid = data_byNid
+        self.D_byNid = D_byNid
+        self.p_is = None
         self.modelSize = modelSize
         self.N_k = []
+        self.ready = False
+    
+    def __eq__(self, other):
+        if self.k != other.k:
+            raise Exception(str(self.k), str(other.k))
+        if self.p_is != other.p_is:
+            raise Exception(str(self.p_is), str(other.p_is))
+        if self.modelSize != other.modelSize:
+            raise Exception(str(self.modelSize), str(other.modelSize))
+        if self.N_k != other.N_k:
+            raise Exception(str(self.N_k), str(other.N_k))
+        if self.ready != other.ready:
+            raise Exception(str(self.ready), str(other.ready))
+        return True
+        
+    def set_p_is(self, p_is):
+        self.p_is = p_is
         self.ready = False
         
     def set_N_k(self, N_k):
@@ -301,11 +333,19 @@ class Group:
         if self.ready == False: raise Exception
         return self.N_k
     
-    def get_D_k(self): # 그룹 데이터 크기
+    def get_p_k(self): # 그룹 데이터 크기
         if self.ready == False: raise Exception
-        return self.D_k
+        return self.p_k
     
-    def get_nid2_D_k_i(self): # 그룹 노드 별 데이터 크기 집합
+    def get_nid2_p_k_i(self): # 그룹 노드 별 데이터 크기 집합
+        if self.ready == False: raise Exception
+        return self.nid2_p_k_i # 순서가 중요할 때 dict 반환
+    
+    def get_p_k_is(self):
+        if self.ready == False: raise Exception
+        return list(self.nid2_p_k_i.values()) # 순서가 중요하지 않을 때 list 반환
+    
+    def get_nid2_D_k_i(self): # 그룹 노드 별 데이터 집합
         if self.ready == False: raise Exception
         return self.nid2_D_k_i # 순서가 중요할 때 dict 반환
     
@@ -313,32 +353,27 @@ class Group:
         if self.ready == False: raise Exception
         return list(self.nid2_D_k_i.values()) # 순서가 중요하지 않을 때 list 반환
     
-    def get_nid2_Data_k_i(self): # 그룹 노드 별 데이터 집합
-        if self.ready == False: raise Exception
-        return self.nid2_Data_k_i # 순서가 중요할 때 dict 반환
-    
-    def get_Data_k_is(self):
-        if self.ready == False: raise Exception
-        return list(self.nid2_Data_k_i.values()) # 순서가 중요하지 않을 때 list 반환
-    
     def get_Delta_k(self, nid2_g_i__w, g__w):
         if self.ready == False: raise Exception
         g_k_is__w = [ nid2_g_i__w[nid] for nid in self.get_N_k() ]
-        g_k__w = np.average(g_k_is__w, axis=0, weights=self.get_D_k_is())
+        g_k__w = np.average(g_k_is__w, axis=0, weights=self.get_p_k_is())
         Delta_k = np.linalg.norm(g_k__w - g__w)
         return Delta_k
     
     def digest(self, debugging):
         if self.ready == True: return # Group 에 변화가 없을 때 연산되는 것을 방지
-        self.D_k = 0 ;
+        self.p_k = 0
+        self.nid2_p_k_i = {}
         self.nid2_D_k_i = {}
-        self.nid2_Data_k_i = {}
         for nid in self.N_k:
-            data_k_i = self.data_byNid[nid]
-            self.D_k += len(data_k_i['x'])
-            self.nid2_D_k_i[nid] = len(data_k_i['x'])
-            self.nid2_Data_k_i[nid] = data_k_i
-            
+            D_k_i = self.D_byNid[nid]
+            if self.p_is == None: # Weight p 미설정 시, 데이터 개수로 가중치
+                p_k_i = len(D_k_i['x'])
+            else:
+                p_k_i = self.p_is[nid]
+            self.p_k += p_k_i
+            self.nid2_p_k_i[nid] = p_k_i
+            self.nid2_D_k_i[nid] = D_k_i
         if not(debugging):
             self.ps_nid = self.N_k[ np.argmin([ sum( self.ft.getDistance(nid1, nid2) for nid2 in self.N_k ) for nid1 in self.N_k ]) ]
         self.ready = True

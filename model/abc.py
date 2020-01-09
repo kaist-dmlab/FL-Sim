@@ -3,7 +3,7 @@ import numpy as np
 
 from abc import ABC, abstractmethod
 
-from leaf.utils.tf_utils import graph_size
+from leaf.models.utils.tf_utils import graph_size
 
 def next_batch(batchSize, dataBatch):
     x = dataBatch['x']
@@ -32,9 +32,9 @@ def average_w(w_byNid, weight_byNid):
 
 class AbstractModel(ABC):
     
-    def __init__(self, args, x_shape):
+    def __init__(self, args, trainData_by1Nid, testData_by1Nid):
         self.args = args
-        self.x_shape = x_shape
+        self.x_shape = trainData_by1Nid[0]['x'].shape
         
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
@@ -42,7 +42,7 @@ class AbstractModel(ABC):
         self.graph = tf.Graph()
         with self.graph.as_default():
 #             tf.set_random_seed(123 + seed)
-            x_ph_shape = [None] + [ x_shape[j] for j in range(1, len(x_shape)) ]
+            x_ph_shape = [None] + [ self.x_shape[j] for j in range(1, len(self.x_shape)) ]
             self.x = tf.placeholder(name='x', shape=x_ph_shape, dtype=tf.float32)
             self.y = tf.placeholder(name='y', shape=[None], dtype=tf.int32)
             self.lr = tf.placeholder(name='lr', dtype=tf.float32)

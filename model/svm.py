@@ -3,7 +3,14 @@ import numpy as np
 
 from model.abc import AbstractModel
 
+import fl_data
+
 class Model(AbstractModel):
+    
+    def __init__(self, args, trainData_by1Nid, testData_by1Nid):
+        fl_data.flattenX(trainData_by1Nid)
+        fl_data.flattenX(testData_by1Nid)
+        super().__init__(args, trainData_by1Nid, testData_by1Nid)
     
     def createModel(self):
         A_shape = [ self.x_shape[j] for j in range(1, len(self.x_shape)) ] + [1]
