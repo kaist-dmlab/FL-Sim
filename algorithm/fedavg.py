@@ -5,7 +5,7 @@ class Algorithm(AbstractAlgorithm):
     def getFileName(self):
         tau1 = int(self.args.opaque1)
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + self.args.nodeType + self.args.edgeType + '_' + str(tau1)
+                + str(self.args.numNodeClasses) + str(self.args.numEdgeClasses) + '_' + str(tau1)
     
     def __init__(self, args):
         args.edgeType = 'a' # 무조건 처음 edgeType 을 all 로 고정

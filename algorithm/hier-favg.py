@@ -6,7 +6,7 @@ class Algorithm(AbstractAlgorithm):
         tau1 = int(self.args.opaque1)
         tau2 = int(self.args.opaque2)
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + self.args.nodeType + self.args.edgeType + '_' + str(tau1) + '_' + str(tau2)
+                + str(self.args.numNodeClasses) + str(self.args.numEdgeClasses) + '_' + str(tau1) + '_' + str(tau2)
     
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'time', 'aggrType'])

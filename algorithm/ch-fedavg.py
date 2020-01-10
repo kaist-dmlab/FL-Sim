@@ -17,7 +17,7 @@ class Algorithm(AbstractAlgorithm):
     def getFileName(self):
         d_budget = self.args.opaque1
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + self.args.nodeType + self.args.edgeType + '_' + str(d_budget)
+                + str(self.args.numNodeClasses) + str(self.args.numEdgeClasses) + '_' + str(d_budget)
     
     def __init__(self, args):
 #         args.edgeType = 'a' # 무조건 처음 edgeType 을 all 로 고정
@@ -90,12 +90,15 @@ class Algorithm(AbstractAlgorithm):
     #                 print(self.model.np_modelEquals(g_is__w[nid], g_is__w2[nid]), self.model.np_modelEquals(nid2_g_i__w[nid], nid2_g_i__w2[nid]))
                 g__w = np.average(g_is__w, axis=0, weights=c.get_p_is())
         
+#                 D_is = c.get_D_is()
+#                 p_is = [ len(np.unique(D_i['y'])) for D_i in D_is ]
+#                 print(p_is)
 #                 p_is = [ 1 for _ in range(len(c.get_N())) ]
 #                 c.set_p_is(p_is)
 #                 c.digest(c.z)
         
                 # IID Grouping
-#                 c = self.run_IID_Weighting(c, nid2_g_i__w, g__w)
+                c = self.run_IID_Weighting(c, nid2_g_i__w, g__w)
 #                 (c, tau1, tau2, d_group, d_global) = self.run_IID_Grouping(c, nid2_g_i__w, g__w, d_budget)
             t_prev = t # Mark Time
             t3 += 1
@@ -110,8 +113,9 @@ class Algorithm(AbstractAlgorithm):
         print('IID Weighting Started')
         
         c_star = c.clone()
-        Delta_star = self.get_dDelta(c, nid2_g_i__w, g__w)
+#         Delta_star = self.get_dDelta(c, nid2_g_i__w, g__w)
 #         Delta_star = c.get_Delta(nid2_g_i__w, g__w)
+        Delta_star = c.get_emd()
         print('Initial Delta_star=%.4f' % (Delta_star))
         
         cntIdx = 0
@@ -129,8 +133,9 @@ class Algorithm(AbstractAlgorithm):
             c.set_p_is(p_is)
             c.digest(c.z)
             
-            Delta_up = self.get_dDelta(c, nid2_g_i__w, g__w)
+#             Delta_up = self.get_dDelta(c, nid2_g_i__w, g__w)
 #             Delta_up = c.get_Delta(nid2_g_i__w, g__w)
+            Delta_up = c.get_emd()
             if Delta_star > Delta_up:
                 # 유리할 경우 변경
                 (c_star, Delta_star) = (c.clone(), Delta_up)
@@ -149,8 +154,9 @@ class Algorithm(AbstractAlgorithm):
                 c.set_p_is(p_is)
                 c.digest(c.z)
                 
-                Delta_down = self.get_dDelta(c, nid2_g_i__w, g__w)
+#                 Delta_down = self.get_dDelta(c, nid2_g_i__w, g__w)
 #                 Delta_down = c.get_Delta(nid2_g_i__w, g__w)
+                Delta_down = c.get_emd()
                 if Delta_star > Delta_down:
                     # 유리할 경우 변경
                     (c_star, Delta_star) = (c.clone(), Delta_down)
