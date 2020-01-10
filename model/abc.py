@@ -52,9 +52,15 @@ class AbstractModel(ABC):
             self.train_op = self.getOptimizer()
             self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_hat, self.y), tf.float32))
         self.sess = tf.Session(config=config, graph=self.graph)
+        
         self.size = graph_size(self.graph)
+        
         with self.graph.as_default():
             self.sess.run(tf.global_variables_initializer())
+            
+#             metadata = tf.RunMetadata()
+#             opts = tf.profiler.ProfileOptionBuilder.float_operation()
+#             self.flops = tf.profiler.profile(self.graph, run_meta=metadata, cmd='scope', options=opts).total_float_ops
             
     def __del__(self):
         self.sess.close()
@@ -116,6 +122,8 @@ class AbstractModel(ABC):
             (w_byTime, w_last) = self.local_train(dataBatch, lr, tau1)
             w_byTime_byNid.append(w_byTime)
             w_last_byNid.append(w_last)
+        # https://github.com/TalwalkarLab/leaf/blob/fb5b1da258a4d332fe8dbc15c656dad82ed8a20d/models/model.py#L91
+#         comp = tau1 * len(trainData_byNid[0]['y']) * self.flops
         return w_byTime_byNid, w_last_byNid
     
     def federated_train(self, w, trainData_byNid, lr, tau1, weight_byNid):

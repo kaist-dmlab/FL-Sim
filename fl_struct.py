@@ -21,6 +21,7 @@ PORT = 9
 STOP_TIME = 10.0
 
 class FatTree:
+    
     # numEdges 를 입력받으면 K/2 = int(sqrt(numEdges / 2)) 로써, 소수가 발생하기 때문에,
     # 실험 편의성을 높이기 위해 Pod 의 개수로 대체한다.
     def __init__(self, numNodes, numPods):
@@ -204,11 +205,26 @@ class FatTree:
         return self.dist[nid1][nid2]
     
 class Cloud:
+    
     def __init__(self, ft, D_byNid, numGroups, modelSize=-1):
         self.ft = ft
         self.D_byNid = D_byNid
+        numTotalClasses = len(np.unique(np.concatenate([D_byNid[nid]['y'] for nid in range(len(D_byNid))])))
+        cid2_pc = np.zeros(numTotalClasses, dtype=np.int32)
+        nid2_cid2_pc_is = {}
+        nid2_cid2_numClasses_is = {}
+        for nid in range(len(D_byNid)):
+            cid2_numClasses_i = np.zeros(numTotalClasses, dtype=np.int32)
+            for j in range(len(D_byNid[nid]['x'])):
+                cid = self.D_byNid[nid]['y'][j]
+                cid2_pc[cid] += 1
+                cid2_numClasses_i[cid] += 1
+            nid2_cid2_numClasses_is[nid] = cid2_numClasses_i
+            nid2_cid2_pc_is[nid] = cid2_numClasses_i / sum(cid2_numClasses_i)
+        cid2_pc = cid2_pc / sum(cid2_pc)
+        
         self.modelSize = modelSize
-        self.groups = [ Group(k, ft, D_byNid, modelSize) for k in range(numGroups) ]
+        self.groups = [ Group(k, ft, D_byNid, modelSize, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is) for k in range(numGroups) ]
         self.ps_nid = 0 # 모든 노드와의 거리가 같으므로 처음 노드로 설정
         self.ready = False
     
@@ -225,6 +241,7 @@ class Cloud:
     
     def clone(self):
         c_cloned = fl_struct.Cloud(self.ft, self.D_byNid, len(self.groups), self.modelSize)
+        c_cloned.set_p_is(self.get_p_is())
         c_cloned.digest(self.z)
         return c_cloned
         
@@ -269,6 +286,18 @@ class Cloud:
         Delta_ks = [ g.get_Delta_k(nid2_g_i__w, g__w) for g in self.groups ]
         Delta = np.average(Delta_ks, weights=self.get_p_ks())
         return Delta
+    
+    def get_emd(self):
+        if self.ready == False: raise Exception
+        emd_ks = [ g.get_emd_k() for g in self.groups ]
+        emd = np.average(emd_ks, weights=self.get_p_ks())
+        return emd
+    
+    def get_EMD(self):
+        if self.ready == False: raise Exception
+        EMD_ks = [ g.get_EMD_k() for g in self.groups ]
+        EMD = np.average(EMD_ks, weights=self.get_p_ks())
+        return EMD
         
     def digest(self, z, debugging=False):
         self.z = z
@@ -297,16 +326,24 @@ class Cloud:
             self.ready = True
             return True
         
+def calcEMD(a, b):
+    if len(a) != len(b): raise Exception(len(a), len(b))
+    return sum([ abs(a[i] - b[i]) for i in range(len(a)) ])
+
 class Group:
-    def __init__(self, k, ft, D_byNid, modelSize):
+    
+    def __init__(self, k, ft, D_byNid, modelSize, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is):
         self.k = k
         self.ft = ft
         self.D_byNid = D_byNid
         self.p_is = None
         self.modelSize = modelSize
+        self.cid2_pc = cid2_pc
+        self.nid2_cid2_pc_is = nid2_cid2_pc_is
+        self.nid2_cid2_numClasses_is = nid2_cid2_numClasses_is
         self.N_k = []
         self.ready = False
-    
+        
     def __eq__(self, other):
         if self.k != other.k:
             raise Exception(str(self.k), str(other.k))
@@ -319,7 +356,7 @@ class Group:
         if self.ready != other.ready:
             raise Exception(str(self.ready), str(other.ready))
         return True
-        
+    
     def set_p_is(self, p_is):
         self.p_is = p_is
         self.ready = False
@@ -328,7 +365,7 @@ class Group:
         if not(self.N_k == N_k):
             self.N_k = N_k
             self.ready = False
-        
+            
     def get_N_k(self): # 그룹 노드 집합
         if self.ready == False: raise Exception
         return self.N_k
@@ -359,6 +396,26 @@ class Group:
         g_k__w = np.average(g_k_is__w, axis=0, weights=self.get_p_k_is())
         Delta_k = np.linalg.norm(g_k__w - g__w)
         return Delta_k
+    
+    def get_emd_k(self):
+        if self.ready == False: raise Exception
+        numTotalClasses = len(self.cid2_pc)
+        cid2_pc_k = np.zeros(numTotalClasses, dtype=np.int32)
+        for nid in self.N_k:
+            cid2_pc_k += self.nid2_cid2_numClasses_is[nid]
+        cid2_pc_k = cid2_pc_k / sum(cid2_pc_k)
+        emd_k_is = [ calcEMD(self.nid2_cid2_pc_is[nid], cid2_pc_k) for nid in self.get_N_k() ]
+        emd_k = np.average(emd_k_is, weights=self.get_p_k_is())
+        return emd_k
+    
+    def get_EMD_k(self):
+        if self.ready == False: raise Exception
+        cid2_pc_k = np.zeros(numTotalClasses, dtype=np.int32)
+        for nid in self.N_k:
+            cid2_pc_k += self.nid2_cid2_numClasses_is[nid]
+        cid2_pc_k = cid2_pc_k / sum(cid2_pc_k)
+        EMD_k = calcEMD(self.cid2_pc_k, self.cid2_pc)
+        return EMD_k
     
     def digest(self, debugging):
         if self.ready == True: return # Group 에 변화가 없을 때 연산되는 것을 방지

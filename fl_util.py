@@ -14,22 +14,20 @@ def parseArgs():
     parser.add_argument('--dataName',
                     help='dataName',
                     type=str,
-                    choices=['mnist-o', 'mnist-f', 'cifar10'],
+                    choices=['mnist-o', 'mnist-f', 'cifar10', 'femnist', 'celeba'],
                     required=True)
     parser.add_argument('--algName',
                     help='algName',
                     type=str,
                     choices=['cgd', 'fedavg', 'hier-favg', 'ch-fedavg'],
                     required=True)
-    parser.add_argument('--nodeType',
-                    help='nodeType',
+    parser.add_argument('--numNodeClasses',
+                    help='numNodeClasses',
                     type=int,
-                    choices=[2, 4, 6, 8],
                     required=True)
-    parser.add_argument('--edgeType',
-                    help='edgeType',
+    parser.add_argument('--numEdgeClasses',
+                    help='numEdgeClasses',
                     type=int,
-                    choices=[2, 4, 6, 8],
                     required=True)
     parser.add_argument('--opaque1',
                     help='opaque1',
@@ -100,7 +98,7 @@ def parseArgs():
         args.maxTime = 500
     elif args.modelName == 'cnn':
         args.sgdEnabled = True
-        if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
+        if args.dataName == 'mnist-o' or args.dataName == 'mnist-f' or args.dataName == 'femnist' or args.dataName == 'celeba':
             args.maxTime = 1000
         else:
             raise Exception(args.modelName, args.dataName)
