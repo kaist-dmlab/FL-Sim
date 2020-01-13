@@ -2,6 +2,7 @@ import tensorflow as tf
 import importlib
 import numpy as np
 import os
+import collections
 import csv
 from time import gmtime, strftime #strftime("%m%d_%H%M%S", gmtime()) + ' ' + 
 
@@ -78,7 +79,10 @@ class AbstractAlgorithm(ABC):
         
         (trainData_byNid, z_edge) = fl_data.groupByEdge(self.trainData_by1Nid, self.args.numNodeClasses, self.args.numEdgeClasses, self.args.numNodes, self.args.numEdges)
 #         print('Num Data per Node:', [ len(D_i['x']) for D_i in trainData_byNid ])
-#         print('Num Class per Node:', [ len(np.unique(D_i['y'])) for D_i in trainData_byNid ])
+#         numClassPerNodeList = [ len(np.unique(D_i['y'])) for D_i in trainData_byNid ]
+#         print('Num Class per Node:', numClassPerNodeList)
+#         counter = collections.Counter(numClassPerNodeList)
+#         print('Num Class per Node Counter:', counter)
         print('Shape of trainData on 1st node:', trainData_byNid[0]['x'].shape, trainData_byNid[0]['y'].shape)
         
         fileName = self.getFileName()

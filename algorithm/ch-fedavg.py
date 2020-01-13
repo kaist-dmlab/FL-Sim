@@ -1,5 +1,6 @@
 import numpy as np
 import csv
+import random
 from time import gmtime, strftime #strftime("%m%d_%H%M%S", gmtime()) + ' ' + 
 
 from algorithm.abc import AbstractAlgorithm
@@ -42,7 +43,7 @@ class Algorithm(AbstractAlgorithm):
         d_budget = self.args.opaque1
         
     #     for t3 in range(int(self.args.maxEpoch/(tau1*tau2))):
-        t = 0 ; t_prev = 0 ; tau1 = 10 ; tau2 = 1 ; t3 = 0 ;
+        t = 0 ; t_prev = 0 ; tau1 = 5 ; tau2 = 2 ; t3 = 0
         while True:
             for t2 in range(tau2):
                 w_is = []
@@ -98,122 +99,159 @@ class Algorithm(AbstractAlgorithm):
 #                 c.digest(c.z)
         
                 # IID Grouping
-                c = self.run_IID_Weighting(c, nid2_g_i__w, g__w)
-#                 (c, tau1, tau2, d_group, d_global) = self.run_IID_Grouping(c, nid2_g_i__w, g__w, d_budget)
+#                 c = self.run_IID_Weighting(c, nid2_g_i__w, g__w)
+                (c, tau1, tau2, d_group, d_global) = self.run_IID_Grouping(c, nid2_g_i__w, g__w, d_budget)
             t_prev = t # Mark Time
             t3 += 1
-    
-    def get_dDelta(self, c, nid2_g_i__w, g__w):
-        g_is__w = [ nid2_g_i__w[nid] for nid in c.get_N() ]
-        dDelta_is__w = [ np.linalg.norm(g_i__w - g__w) for g_i__w in g_is__w ]
-        dDelta = np.average(dDelta_is__w, axis=0, weights=c.get_p_is())
-        return dDelta
             
-    def run_IID_Weighting(self, c, nid2_g_i__w, g__w):
+    def run_IID_Weighting(self, c, nid2_g_i__w, g__w, mode=1):
         print('IID Weighting Started')
+        random.seed(1234)
         
         c_star = c.clone()
-#         Delta_star = self.get_dDelta(c, nid2_g_i__w, g__w)
-#         Delta_star = c.get_Delta(nid2_g_i__w, g__w)
-        Delta_star = c.get_emd()
-        print('Initial Delta_star=%.4f' % (Delta_star))
+        if mode == 1:
+            delta_star = c.get_Delta(nid2_g_i__w, g__w)
+        elif mode == 2:
+            delta_star = c.get_delta(nid2_g_i__w)
+        elif mode == 3:
+            delta_star = c.get_DELTA(nid2_g_i__w, g__w)
+        else:
+            delta_star = c.get_emd()
+        print('Initial delta_star=%.4f' % (delta_star))
         
         cntIdx = 0
         cntSteady = 0
         cntPrint = 0
         while cntSteady < WEIGHTING_MAX_STEADY_STEPS:
-            p_is = c.get_p_is()
-#             p_is = [ p_is[i]+5 if d_l_to_g[i] < d_l_to_g_mean else p_is[i]-5 for i in range(len(d_l_to_g)) ]
-#             randIdx = random.randrange(len(c.get_N()))
             curIdx = cntIdx % len(c.get_N())
             cntIdx += 1
+            (c_star, delta_star, cntSteady, cntPrint) = self.improveWeightOnIdx(c, c_star, delta_star, nid2_g_i__w, g__w, curIdx, cntSteady, cntPrint, mode)
+#             randIdx = random.randint(0, len(c.get_N())-1)
+#             (c_star, delta_star, cntSteady, cntPrint) = self.improveWeightOnIdx(c, c_star, delta_star, nid2_g_i__w, g__w, randIdx, cntSteady, cntPrint, mode)
+
+#         # Tweak weights
+#         p_is = c.get_p_is()
+#         for i in range(len(p_is)):
+#             if random.choice([True, False]) == True:
+#                 p_is[i] += WEIGHTING_WEIGHT_DIFF
+#             else:
+#                 if p_is[i] > WEIGHTING_WEIGHT_DIFF:
+#                     p_is[i] -= WEIGHTING_WEIGHT_DIFF
+#                 else:
+#                     p_is[i] = 0
+#         c.set_p_is(p_is)
+#         c.digest(c.z)
         
-            # 높은 Weight 로 변경 시도
-            p_is[curIdx] += WEIGHTING_WEIGHT_DIFF
+#         if mode == 1:
+#             delta_cur = c.get_Delta(nid2_g_i__w, g__w)
+#         elif mode == 2:
+#             delta_cur = c.get_delta(nid2_g_i__w)
+#         elif mode == 3:
+#             delta_cur = c.get_DELTA(nid2_g_i__w, g__w)
+#         else:
+#             delta_cur = c.get_emd()
+#         print('Tweaked delta_star=%.4f, delta_cur=%.4f' % (delta_star, delta_cur))
+            
+        print('IID Weighting Finished')
+        return c_star
+    
+    def improveWeightOnIdx(self, c, c_star, delta_star, nid2_g_i__w, g__w, curIdx, cntSteady, cntPrint, mode):
+        p_is = c.get_p_is()
+        
+        # 높은 Weight 로 변경 시도
+        p_is[curIdx] += WEIGHTING_WEIGHT_DIFF
+        c.set_p_is(p_is)
+        c.digest(c.z)
+        
+        if mode == 1:
+            delta_up = c.get_Delta(nid2_g_i__w, g__w)
+        elif mode == 2:
+            delta_up = c.get_delta(nid2_g_i__w)
+        elif mode == 3:
+            delta_up = c.get_DELTA(nid2_g_i__w, g__w)
+        else:
+            delta_up = c.get_emd()
+        if delta_star > delta_up:
+            # 유리할 경우 변경
+            (c_star, delta_star) = (c.clone(), delta_up)
+            cntSteady = 0 # 한 번이라도 바뀌면 Steady 카운터 초기화
+            cntPrint += 1
+            if cntPrint % 100 == 0:
+                print('delta_star=%.4f, delta_cur=%.4f' % (delta_star, delta_up))
+                self.fwDelta.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, delta_star, delta_up])
+        else:
+            # 유리하지 않을 경우,
+            # 낮은 Weight 로 변경 시도 (2배: 원래대로 돌리는 것 포함)
+            if p_is[curIdx] > 2 * WEIGHTING_WEIGHT_DIFF:
+                p_is[curIdx] -= 2 * WEIGHTING_WEIGHT_DIFF
+            else:
+                p_is[curIdx] = 0
             c.set_p_is(p_is)
             c.digest(c.z)
             
-#             Delta_up = self.get_dDelta(c, nid2_g_i__w, g__w)
-#             Delta_up = c.get_Delta(nid2_g_i__w, g__w)
-            Delta_up = c.get_emd()
-            if Delta_star > Delta_up:
+            if mode == 1:
+                delta_down = c.get_Delta(nid2_g_i__w, g__w)
+            elif mode == 2:
+                delta_down = c.get_delta(nid2_g_i__w)
+            elif mode == 3:
+                delta_down = c.get_DELTA(nid2_g_i__w, g__w)
+            else:
+                delta_down = c.get_emd()
+            if delta_star > delta_down:
                 # 유리할 경우 변경
-                (c_star, Delta_star) = (c.clone(), Delta_up)
+                (c_star, delta_star) = (c.clone(), delta_down)
                 cntSteady = 0 # 한 번이라도 바뀌면 Steady 카운터 초기화
                 cntPrint += 1
                 if cntPrint % 100 == 0:
-                    print('Delta_star=%.4f, Delta_cur=%.4f' % (Delta_star, Delta_up))
-                    self.fwDelta.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, Delta_star, Delta_up])
+                    print('delta_star=%.4f, delta_cur=%.4f' % (delta_star, delta_down))
+                    self.fwDelta.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, delta_star, delta_down])
             else:
-                # 유리하지 않을 경우,
-                # 낮은 Weight 로 변경 시도 (2배: 원래대로 돌리는 것 포함)
-                if p_is[curIdx] > 2 * WEIGHTING_WEIGHT_DIFF:
-                    p_is[curIdx] -= 2 * WEIGHTING_WEIGHT_DIFF
-                else:
-                    p_is[curIdx] = 0
+                # 유리하지 않을 경우, 다시 원래대로 초기화
+                p_is[curIdx] += WEIGHTING_WEIGHT_DIFF
                 c.set_p_is(p_is)
                 c.digest(c.z)
-                
-#                 Delta_down = self.get_dDelta(c, nid2_g_i__w, g__w)
-#                 Delta_down = c.get_Delta(nid2_g_i__w, g__w)
-                Delta_down = c.get_emd()
-                if Delta_star > Delta_down:
-                    # 유리할 경우 변경
-                    (c_star, Delta_star) = (c.clone(), Delta_down)
-                    cntSteady = 0 # 한 번이라도 바뀌면 Steady 카운터 초기화
-                    cntPrint += 1
-                    if cntPrint % 100 == 0:
-                        print('Delta_star=%.4f, Delta_cur=%.4f' % (Delta_star, Delta_down))
-                        self.fwDelta.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, Delta_star, Delta_down])
-                else:
-                    # 유리하지 않을 경우, 다시 원래대로 초기화
-                    p_is[curIdx] += WEIGHTING_WEIGHT_DIFF
-                    c.set_p_is(p_is)
-                    c.digest(c.z)
-                    cntSteady += 1
-                    
-        print('IID Weighting Finished')
-        return c_star
+                cntSteady += 1
+        return (c_star, delta_star, cntSteady, cntPrint)
         
     def run_IID_Grouping(self, c, nid2_g_i__w, g__w, d_budget):
         print('IID Grouping Started')
         
         # 최적 초기화
         c_star = c.clone()
-        Delta_star = c_star.get_Delta(nid2_g_i__w, g__w)
-        print('Initial Delta_star=%.4f' % (Delta_star))
-        self.fwDelta.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), 0, Delta_star, Delta_star])
+        DELTA_star = c_star.get_DELTA(nid2_g_i__w, g__w)
+        print('Initial DELTA_star=%.4f' % (DELTA_star))
+        self.fwDelta.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), 0, DELTA_star, DELTA_star])
         
         cntSteady = 0
         while cntSteady < GROUPING_MAX_STEADY_STEPS:
-            Delta_cur = self.iterate_IID_Grouping(c, nid2_g_i__w, g__w)
-            if Delta_star > Delta_cur:
-                (c_star, Delta_star) = (c.clone(), Delta_cur)
+            DELTA_cur = self.iterate_IID_Grouping(c, nid2_g_i__w, g__w)
+            if DELTA_star > DELTA_cur:
+                (c_star, DELTA_star) = (c.clone(), DELTA_cur)
                 cntSteady = 0 # 한 번이라도 바뀌면 Steady 카운터 초기화
             else:
                 cntSteady += 1
-            print('cntSteady=%d, Delta_star=%.4f, Delta_cur=%.4f' % (cntSteady, Delta_star, Delta_cur))
-            self.fwDelta.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, Delta_star, Delta_cur])
+            print('cntSteady=%d, DELTA_star=%.4f, DELTA_cur=%.4f' % (cntSteady, DELTA_star, DELTA_cur))
+            self.fwDelta.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, DELTA_star, DELTA_cur])
             
         d_global = c.get_d_global(True)
         d_group = c.get_d_group(True)
-        tau1 = 1
-        tau2 = 5
+        tau1 = 5
+        tau2 = 2
 #         tau2 = int(d_budget)
 #         if d_group < d_global:
 #             tau2 = max( int((d_budget + d_group - d_global) / d_group), 1 )
 #         else:
 #             tau2 = 2
-        print('Final Delta_star=%.4f, tau1=%d, tau2=%d' % (Delta_star, tau1, tau2))
+        print('Final DELTA_star=%.4f, tau1=%d, tau2=%d' % (DELTA_star, tau1, tau2))
     
-        Delta_star = c_star.get_Delta(nid2_g_i__w, g__w)
-        print('Final Delta_star=%.4f, tau1=%d, tau2=%d' % (Delta_star, tau1, tau2))
+        DELTA_star = c_star.get_DELTA(nid2_g_i__w, g__w)
+        print('Final DELTA_star=%.4f, tau1=%d, tau2=%d' % (DELTA_star, tau1, tau2))
         
         print('IID Grouping Finished')
         return c_star, tau1, tau2, d_group, d_global
     
     def iterate_IID_Grouping(self, c, nid2_g_i__w, g__w):
-        Delta_cur = c.get_Delta(nid2_g_i__w, g__w)
+        DELTA_cur = c.get_DELTA(nid2_g_i__w, g__w)
 
         # Iteration 마다 탐색 인덱스 셔플
         idx_Nid1 = np.arange(len(c.get_N()))
@@ -247,19 +285,19 @@ class Algorithm(AbstractAlgorithm):
                 # 한 그룹에 노드가 전부 없어지는 것은 있을 수 없는 경우
                 if c.digest(z) == False: raise Exception(str(z))
                     
-                # 다음 후보에 대한 Delta 계산
-                Delta_next = c.get_Delta(nid2_g_i__w, g__w)
+                # 다음 후보에 대한 DELTA 계산
+                DELTA_next = c.get_DELTA(nid2_g_i__w, g__w)
                 
-                if Delta_cur > Delta_next:
+                if DELTA_cur > DELTA_next:
                     # 유리할 경우 변경
-                    Delta_cur = Delta_next
+                    DELTA_cur = DELTA_next
                 else:
                     # 유리하지 않을 경우, 다시 원래대로 그룹 멤버쉽 초기화 (다음 Iteration 에서 Digest)
                     temp_k = z[i]
                     z[i] = z[j]
                     z[j] = temp_k
-    #         print(i, Delta_cur)
+    #         print(i, DELTA_cur)
     
         # 마지막 멤버십 초기화가 발생했을 수도 있으므로, Cloud Digest 시도
         if c.digest(z) == False: raise Exception(str(z))
-        return Delta_cur
+        return DELTA_cur
