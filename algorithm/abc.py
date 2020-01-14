@@ -16,9 +16,7 @@ PRINT_INTERVAL = 0.5
 
 def printTimedLogs(fileName):
     fileEpoch = open('logs/' + fileName + '_epoch.csv', 'r')
-    fileEpoch.readline() # 세 줄 제외
-    fileEpoch.readline()
-    fileEpoch.readline()
+    fileEpoch.readline() # 제목 줄 제외
     fileTime = open('logs/' + fileName + '_time.csv', 'w', newline='', buffering=1)
     fwTime = csv.writer(fileTime, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
     fwTime.writerow(['time', 'loss', 'accuracy', 'epoch', 'aggrType'])
@@ -85,17 +83,24 @@ class AbstractAlgorithm(ABC):
 #         print('Num Class per Node Counter:', counter)
         print('Shape of trainData on 1st node:', trainData_byNid[0]['x'].shape, trainData_byNid[0]['y'].shape)
         
+        metadata = { 'numNodes': args.numNodes,
+                    'numEdges': args.numEdges,
+                    'maxTime': args.maxTime,
+                    'sgdEnabled': args.sgdEnabled,
+                    'modelSize': self.model.size,
+                    'lrInitial': args.lrInitial,
+                    'lrDecayRate': args.lrDecayRate,
+                    'numTestSamples': args.numTestSamples,
+                    'batchSize': args.batchSize
+                   }
         fileName = self.getFileName()
         print(fileName)
+        fl_util.dumpJson('logs/' + fileName +'.json', metadata)
         self.fileEpoch = open('logs/' + fileName + '_epoch.csv', 'w', newline='', buffering=1)
         self.fwEpoch = csv.writer(self.fileEpoch, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        self.fwEpoch.writerow([ 'NUM_NODES', 'NUM_EDGES', 'MAX_TIME', 'SGD_ENABLED', 'MODEL_SIZE', \
-                               'LR_INITIAL', 'LR_DECAY_RATE', 'NUM_TEST_SAMPLES', 'BATCH_SIZE' ])
-        self.fwEpoch.writerow([ args.numNodes, args.numEdges, args.maxTime, args.sgdEnabled, self.model.size, \
-                     args.lrInitial, args.lrDecayRate, args.numTestSamples, args.batchSize ])
         
-        ft = fl_struct.FatTree(self.args.numNodes, self.args.numEdges)
-        self.c = fl_struct.Cloud(ft, trainData_byNid, self.args.numGroups, self.model.size)
+        ft = fl_struct.FatTree(self.model.size, self.args.numNodes, self.args.numEdges)
+        self.c = fl_struct.Cloud(ft, trainData_byNid, self.args.numGroups)
         if randomEnabled == False:
             self.c.digest(z_edge)
         else:

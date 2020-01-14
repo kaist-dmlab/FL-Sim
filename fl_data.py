@@ -1,9 +1,7 @@
 import numpy as np
 import random
-import fl_util
 
 from scipy.stats import truncnorm
-
 from collections import Counter
 
 def flattenX(data_by1Nid):
@@ -11,6 +9,13 @@ def flattenX(data_by1Nid):
     
 def sample(data_by1Nid, numSamples):
     return [ { 'x': data_by1Nid[0]['x'][:numSamples], 'y': data_by1Nid[0]['y'][:numSamples] } ]
+
+def to_nids_byGid(z):
+    gids = np.unique(z)
+    for gid in range(len(gids)):
+        if not(gid in gids): return None
+    nids_byGid = [ [ nid for nid, gid in enumerate(z) if gid == gid_ ] for gid_ in gids ]
+    return nids_byGid
 
 def groupByClass(data_by1Nid):
     data_byClass = []
@@ -167,7 +172,6 @@ def sample_truncated_normal(mean=1, sd=1, low=0.5, upp=10, size=1):
         sampled = [int(a) for a in np.round(sampled)]
     return sampled
 
-
 def groupByNode(data_by1Nid, nodeType, numNodes):
     NUM_CLASS = len(np.unique(data_by1Nid[0]['y']))
     data_byNid, z = groupByEdge(data_by1Nid, nodeType, NUM_CLASS, numNodes, 1)
@@ -193,7 +197,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
         EDGE_NODE_CLASS_LIST = []
         for i in range(NUM_EDGES):
     #         When the number of class of each edge is sampled, not exact:
-#             NUM_CLASS_EDGE_SAMPLED = sample_truncated_normal(mean=NUM_CLASS_EDGE, sd=5, low=1, upp=NUM_CLASS_EDGE, size=1)
+#             NUM_CLASS_EDGE_SAMPLED = sample_truncated_normal(mean=NUM_CLASS_EDGE, sd=1, low=1, upp=NUM_CLASS_EDGE, size=1)
 #             class_list = np.random.choice(list(range(NUM_CLASS)), NUM_CLASS_EDGE_SAMPLED, replace=False).tolist()
 #             EDGE_CLASS_LIST.append(class_list)
             
@@ -218,7 +222,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
             while (len(EDGE_CLASS_LIST_REAL_FLAT) != len(EDGE_CLASS_LIST[i])): # check whether all nodes in a edge sample all class assigned to the edge
                 EDGE_NODE_CLASS_LIST[i] = []
                 for j in range(NUM_NODES_PER_EDGE):
-                    num_class_in_node = sample_truncated_normal(mean=NUM_CLASS_NODE, sd=5, low=1, upp=len(edge_class_list), size=1)
+                    num_class_in_node = sample_truncated_normal(mean=NUM_CLASS_NODE, sd=1, low=1, upp=len(edge_class_list), size=1)
                     class_in_node = np.random.choice(edge_class_list, num_class_in_node, replace=False).tolist()
                     if len(class_in_node)==0:
                         print("no class in a node")
@@ -272,7 +276,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
     #     NUM_DATA_PER_SAMPLED_CLASS.append(DATA_BY_CLASS[i]['x'].shape[0]/Class_Counter[i])
 
     #     for j in range(Class_Counter[i]):
-    #         NUM_DATA_PER_SAMPLED_CLASS_PER_NODE[j] = sample_truncated_normal(mean=NUM_DATA_PER_SAMPLED_CLASS[i], sd=5, low=0, upp=2*NUM_DATA_PER_SAMPLED_CLASS[i], size=Class_Counter[i])[0]
+    #         NUM_DATA_PER_SAMPLED_CLASS_PER_NODE[j] = sample_truncated_normal(mean=NUM_DATA_PER_SAMPLED_CLASS[i], sd=1, low=0, upp=2*NUM_DATA_PER_SAMPLED_CLASS[i], size=Class_Counter[i])[0]
 
 
     trainData_byNid = []
@@ -284,7 +288,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
             train_z.append(edge_ind)
             for i in node_class_list: # i-th node
                 if initial_counter == 0: # make initial x,y dictionary for each node
-                    num_sampled = sample_truncated_normal(mean=NUM_DATA_PER_SAMPLED_CLASS[i], sd=5, low=1, upp=2*NUM_DATA_PER_SAMPLED_CLASS[i], size=1)[0] # number of datapoint for a class in a node
+                    num_sampled = sample_truncated_normal(mean=NUM_DATA_PER_SAMPLED_CLASS[i], sd=1, low=1, upp=2*NUM_DATA_PER_SAMPLED_CLASS[i], size=1)[0] # number of datapoint for a class in a node
                     if NUM_DATA_PER_CLASS[i] > num_sampled:
                         indice_sampled = np.random.choice(range(NUM_DATA_PER_CLASS[i]), size=num_sampled, replace=False).tolist()
                         trainData_byNid.append({'x':DATA_BY_CLASS[i]['x'][indice_sampled] , 'y':DATA_BY_CLASS[i]['y'][indice_sampled]})
@@ -301,7 +305,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
                         NUM_DATA_PER_CLASS[i] = 0
                         initial_counter += 1
                 else: # add next datapoint from other class to x,y dictionary for each node
-                    num_sampled = sample_truncated_normal(mean=NUM_DATA_PER_SAMPLED_CLASS[i], sd=5, low=1, upp=2*NUM_DATA_PER_SAMPLED_CLASS[i], size=1)[0] # number of datapoint for a class in a node
+                    num_sampled = sample_truncated_normal(mean=NUM_DATA_PER_SAMPLED_CLASS[i], sd=1, low=1, upp=2*NUM_DATA_PER_SAMPLED_CLASS[i], size=1)[0] # number of datapoint for a class in a node
                     if NUM_DATA_PER_CLASS[i] > num_sampled:
                         indice_sampled = np.random.choice(range(NUM_DATA_PER_CLASS[i]), size=num_sampled, replace=False).tolist()
                         trainData_byNid[-1]['x'] = np.concatenate([trainData_byNid[-1]['x'],DATA_BY_CLASS[i]['x'][indice_sampled]])
@@ -323,7 +327,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
     
     
     
-    nids_byGid = fl_util.to_nids_byGid(train_z)
+    nids_byGid = to_nids_byGid(train_z)
     trainData_byNid_NODE_CLASS_LIST = [np.unique(trainData_byNid[nid]['y']).tolist() for nids in nids_byGid for nid in nids]
 #     print(trainData_byNid_NODE_CLASS_LIST)
     for i in range(NUM_CLASS):

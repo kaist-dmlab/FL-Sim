@@ -4,7 +4,7 @@ import random
 from time import gmtime, strftime #strftime("%m%d_%H%M%S", gmtime()) + ' ' + 
 
 from algorithm.abc import AbstractAlgorithm
-import fl_util
+import fl_data
 
 GROUPING_INTERVAL = 10000
 GROUPING_MAX_STEADY_STEPS = 3
@@ -273,7 +273,7 @@ class Algorithm(AbstractAlgorithm):
                 z[i] = z[j]
                 z[j] = temp_k
                 
-                nids_byGid = fl_util.to_nids_byGid(z)
+                nids_byGid = fl_data.to_nids_byGid(z)
                 numClassesPerGroup = np.mean([ len(np.unique(np.concatenate([c.D_byNid[nid]['y'] for nid in nids]))) for nids in nids_byGid ])
                 if numClassesPerGroup != 10:
                     # 데이터 분포가 IID 가 아니게 될 경우, 다시 원래대로 그룹 멤버쉽 초기화

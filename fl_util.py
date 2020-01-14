@@ -1,8 +1,8 @@
 import argparse
 import numpy as np
 
-from leaf.models.utils import model_utils
 import pickle
+import json
 
 def parseArgs():
     parser = argparse.ArgumentParser()
@@ -112,21 +112,18 @@ def parseArgs():
         raise Exception(args.modelName)
     return args
 
-def to_nids_byGid(z):
-    gids = np.unique(z)
-    for gid in range(len(gids)):
-        if not(gid in gids): return None
-    nids_byGid = [ [ nid for nid, gid in enumerate(z) if gid == gid_ ] for gid_ in gids ]
-    return nids_byGid
-
-def serialize(dirPath, obj):
-    with open(dirPath, 'wb') as handle:
+def serialize(filePath, obj):
+    with open(filePath, 'wb') as handle:
         pickle.dump(obj, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
-def deserialize(dirPath):
-    with open(dirPath, 'rb') as handle:
-        obj = pickle.load(handle)
-        return obj
+def deserialize(filePath):
+    with open(filePath, 'rb') as handle:
+        return pickle.load(handle)
     
-def readJsonDir(dirPath):
-    return model_utils.read_dir(dirPath)
+def dumpJson(filePath, jsonObj):
+    with open(filePath, "w") as handle:
+        json.dump(jsonObj, handle)
+
+def loadJson(filePath):
+    with open(filePath, 'r') as handle:
+        return json.load(handle)
