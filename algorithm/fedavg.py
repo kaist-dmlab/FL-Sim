@@ -8,7 +8,7 @@ class Algorithm(AbstractAlgorithm):
                 + str(self.args.numNodeClasses) + str(self.args.numEdgeClasses) + '_' + str(tau1)
     
     def __init__(self, args):
-        args.edgeType = 'a' # 무조건 처음 edgeType 을 all 로 고정
+#         args.numEdgeClasses = 10 # 무조건 처음 edgeType 을 all 로 고정
         super().__init__(args)
     
     def run(self):

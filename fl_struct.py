@@ -8,14 +8,14 @@ import ns.network
 import subprocess
 import os
 
-import fl_util
+import fl_data
 import fl_struct
 
-# LINKSPEED = '10Mbps', SIM_SIM_DATA_SIZE = 40000 도 비슷한 결과라서 시뮬레이션 빨리 하기 위해 SIM_DATA_SIZE 를 낮춤
+# LINK_SPEED = '10Mbps', SIM_SIM_DATA_SIZE = 40000 도 비슷한 결과라서 시뮬레이션 빨리 하기 위해 SIM_DATA_SIZE 를 낮춤
 # 시뮬레이션은 SIM_DATA_SIZE 크기가 클 수록 패킷 수가 늘어나서 오래걸림
 # 자세한 결과는 test-struct.ipynb 참조
-LINKSPEED = '1MBps'
-LINKDELAY = '1ms'
+LINK_SPEED = '1MBps'
+LINK_DELAY = '1ms'
 SIM_DATA_SIZE = 4000
 PORT = 9
 STOP_TIME = 10.0
@@ -24,7 +24,9 @@ class FatTree:
     
     # numEdges 를 입력받으면 K/2 = int(sqrt(numEdges / 2)) 로써, 소수가 발생하기 때문에,
     # 실험 편의성을 높이기 위해 Pod 의 개수로 대체한다.
-    def __init__(self, numNodes, numPods):
+    def __init__(self, modelSize, numNodes, numPods):
+        self.modelSize = modelSize
+        
         K_half = int(numPods / 2)
         self.K_half = K_half
         self.numPods = numPods #self.K_half * 2
@@ -65,8 +67,8 @@ class FatTree:
                     
         # Initialize hop distance
         self.dist = { nid1: { nid2: len(nx.shortest_path(self.g, nid1, nid2)) - 1 for nid2 in range(self.numNodes) } for nid1 in range(self.numNodes) }
-                
-    def simulate(self, subject, commPairs, edgeCombineEnabled, modelSize):
+        
+    def simulate(self, subject, commPairs, edgeCombineEnabled, linkSpeed=LINK_SPEED, simDataSize=SIM_DATA_SIZE):
         if edgeCombineEnabled:
             # 현재 통신 Src 중 같은 Edge 에 속하며 같은 Dst 을 가지는 것에 대해 하나만 Src 로 Combine
             combinedCommPairs = {}
@@ -108,8 +110,8 @@ class FatTree:
             return "%d.%d.%d.0" % (pid + 201, eid + 1, nid + 1)
         
         p2p = ns.point_to_point.PointToPointHelper()
-        p2p.SetDeviceAttribute('DataRate', ns.core.StringValue(LINKSPEED))
-        p2p.SetChannelAttribute('Delay', ns.core.StringValue(LINKDELAY))
+        p2p.SetDeviceAttribute('DataRate', ns.core.StringValue(linkSpeed))
+        p2p.SetChannelAttribute('Delay', ns.core.StringValue(LINK_DELAY))
         
         for pid in range(self.numPods):
             for cid in range(self.numCores):
@@ -159,11 +161,11 @@ class FatTree:
             srcNid = commPair[0]
             dstNid = commPair[1]
             sourceHelper = ns.applications.BulkSendHelper('ns3::TcpSocketFactory', ns.network.InetSocketAddress(self.xips[dstNid], PORT))
-            sourceHelper.SetAttribute('MaxBytes', ns.core.UintegerValue(SIM_DATA_SIZE))
+            sourceHelper.SetAttribute('MaxBytes', ns.core.UintegerValue(simDataSize))
             sourceApps = sourceHelper.Install(nodes.Get(srcNid))
             sourceApps.Start(ns.core.Seconds(0.0))
             sourceApps.Stop(ns.core.Seconds(STOP_TIME))
-            totalBytesSent += SIM_DATA_SIZE
+            totalBytesSent += simDataSize
             
         sinkAppsList = []
         for dstNid in np.unique(commPairs[:,1]):
@@ -193,7 +195,7 @@ class FatTree:
                 return float(lastLine.split()[0])
         def toSec(d):
             # 10: Network Simulation 을 빨리 하기 위해 1MBps/1000크기(10MBps/10000크기와 유사한 결과)로 했으며, 따라서 데이터 크기를 10 더 나눠줌
-            return d / (SIM_DATA_SIZE * 10) * modelSize
+            return d / (SIM_DATA_SIZE * 10) * self.modelSize
         #print('Total Bytes Received :', sum( ns.applications.PacketSink(sinkApps.Get(0)).GetTotalRx() for sinkApps in sinkAppsList ))
         maxPcapTime = max( getPcapTime('pcap/' + fileName) for fileName in os.listdir('pcap') )
         if maxPcapTime == -1: raise Exception()
@@ -206,7 +208,7 @@ class FatTree:
     
 class Cloud:
     
-    def __init__(self, ft, D_byNid, numGroups, modelSize=-1):
+    def __init__(self, ft, D_byNid, numGroups):
         self.ft = ft
         self.D_byNid = D_byNid
         numTotalClasses = len(np.unique(np.concatenate([D_byNid[nid]['y'] for nid in range(len(D_byNid))])))
@@ -223,14 +225,11 @@ class Cloud:
             nid2_cid2_pc_is[nid] = cid2_numClasses_i / sum(cid2_numClasses_i)
         cid2_pc = cid2_pc / sum(cid2_pc)
         
-        self.modelSize = modelSize
-        self.groups = [ Group(k, ft, D_byNid, modelSize, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is) for k in range(numGroups) ]
+        self.groups = [ Group(k, ft, D_byNid, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is) for k in range(numGroups) ]
         self.ps_nid = 0 # 모든 노드와의 거리가 같으므로 처음 노드로 설정
         self.ready = False
     
     def __eq__(self, other):
-        if self.modelSize != other.modelSize:
-            raise Exception(str(self.modelSize), str(other.modelSize))
         if self.groups != other.groups:
             raise Exception(str(self.groups), str(other.groups))
         if self.ps_nid != other.ps_nid:
@@ -240,7 +239,7 @@ class Cloud:
         return True
     
     def clone(self):
-        c_cloned = fl_struct.Cloud(self.ft, self.D_byNid, len(self.groups), self.modelSize)
+        c_cloned = fl_struct.Cloud(self.ft, self.D_byNid, len(self.groups))
         c_cloned.set_p_is(self.get_p_is())
         c_cloned.digest(self.z)
         return c_cloned
@@ -272,20 +271,32 @@ class Cloud:
     
     def get_d_global(self, edgeCombineEnabled):
         if self.ready == False: raise Exception
-        return self.ft.simulate('d_global', [ [nid, self.ps_nid] for nid in self.N ], edgeCombineEnabled, self.modelSize)
+        return self.ft.simulate('d_global', [ [nid, self.ps_nid] for nid in self.N ], edgeCombineEnabled)
     
     def get_d_group(self, edgeCombineEnabled):
         if self.ready == False: raise Exception
         commPairs = []
         for g in self.groups:
             commPairs += [ [nid, g.ps_nid] for nid in g.get_N_k() ]
-        return self.ft.simulate('d_group', commPairs, edgeCombineEnabled, self.modelSize)
+        return self.ft.simulate('d_group', commPairs, edgeCombineEnabled)
+    
+    def get_delta(self, nid2_g_i__w):
+        if self.ready == False: raise Exception
+        delta_ks = [ g.get_delta_k(nid2_g_i__w) for g in self.groups ]
+        delta = np.average(delta_ks, weights=self.get_p_ks())
+        return delta
     
     def get_Delta(self, nid2_g_i__w, g__w):
         if self.ready == False: raise Exception
-        Delta_ks = [ g.get_Delta_k(nid2_g_i__w, g__w) for g in self.groups ]
-        Delta = np.average(Delta_ks, weights=self.get_p_ks())
+        Delta_is = [ np.linalg.norm(nid2_g_i__w[nid] - g__w) for nid in self.get_N() ]
+        Delta = np.average(Delta_is, weights=self.get_p_is())
         return Delta
+    
+    def get_DELTA(self, nid2_g_i__w, g__w):
+        if self.ready == False: raise Exception
+        DELTA_ks = [ g.get_DELTA_k(nid2_g_i__w, g__w) for g in self.groups ]
+        DELTA = np.average(DELTA_ks, weights=self.get_p_ks())
+        return DELTA
     
     def get_emd(self):
         if self.ready == False: raise Exception
@@ -302,7 +313,7 @@ class Cloud:
     def digest(self, z, debugging=False):
         self.z = z
         # Node Grouping 업데이트
-        nids_byGid = fl_util.to_nids_byGid(z)
+        nids_byGid = fl_data.to_nids_byGid(z)
         if nids_byGid == None:
             self.ready = False
             return False
@@ -325,19 +336,14 @@ class Cloud:
                 self.nid2_D_i.update(g.get_nid2_D_k_i())
             self.ready = True
             return True
-        
-def calcEMD(a, b):
-    if len(a) != len(b): raise Exception(len(a), len(b))
-    return sum([ abs(a[i] - b[i]) for i in range(len(a)) ])
 
 class Group:
     
-    def __init__(self, k, ft, D_byNid, modelSize, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is):
+    def __init__(self, k, ft, D_byNid, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is):
         self.k = k
         self.ft = ft
         self.D_byNid = D_byNid
         self.p_is = None
-        self.modelSize = modelSize
         self.cid2_pc = cid2_pc
         self.nid2_cid2_pc_is = nid2_cid2_pc_is
         self.nid2_cid2_numClasses_is = nid2_cid2_numClasses_is
@@ -349,8 +355,6 @@ class Group:
             raise Exception(str(self.k), str(other.k))
         if self.p_is != other.p_is:
             raise Exception(str(self.p_is), str(other.p_is))
-        if self.modelSize != other.modelSize:
-            raise Exception(str(self.modelSize), str(other.modelSize))
         if self.N_k != other.N_k:
             raise Exception(str(self.N_k), str(other.N_k))
         if self.ready != other.ready:
@@ -390,12 +394,24 @@ class Group:
         if self.ready == False: raise Exception
         return list(self.nid2_D_k_i.values()) # 순서가 중요하지 않을 때 list 반환
     
-    def get_Delta_k(self, nid2_g_i__w, g__w):
+    def get_delta_k(self, nid2_g_i__w):
         if self.ready == False: raise Exception
         g_k_is__w = [ nid2_g_i__w[nid] for nid in self.get_N_k() ]
         g_k__w = np.average(g_k_is__w, axis=0, weights=self.get_p_k_is())
-        Delta_k = np.linalg.norm(g_k__w - g__w)
-        return Delta_k
+        delta_k_is = [ np.linalg.norm(nid2_g_i__w[nid] - g_k__w) for nid in self.get_N_k() ]
+        delta_k = np.average(delta_k_is, weights=self.get_p_k_is())
+        return delta_k
+    
+    def get_DELTA_k(self, nid2_g_i__w, g__w):
+        if self.ready == False: raise Exception
+        g_k_is__w = [ nid2_g_i__w[nid] for nid in self.get_N_k() ]
+        g_k__w = np.average(g_k_is__w, axis=0, weights=self.get_p_k_is())
+        DELTA_k = np.linalg.norm(g_k__w - g__w)
+        return DELTA_k
+        
+    def calcEMD(self, a, b):
+        if len(a) != len(b): raise Exception(len(a), len(b))
+        return sum([ abs(a[i] - b[i]) for i in range(len(a)) ])
     
     def get_emd_k(self):
         if self.ready == False: raise Exception
@@ -404,7 +420,7 @@ class Group:
         for nid in self.N_k:
             cid2_pc_k += self.nid2_cid2_numClasses_is[nid]
         cid2_pc_k = cid2_pc_k / sum(cid2_pc_k)
-        emd_k_is = [ calcEMD(self.nid2_cid2_pc_is[nid], cid2_pc_k) for nid in self.get_N_k() ]
+        emd_k_is = [ self.calcEMD(self.nid2_cid2_pc_is[nid], cid2_pc_k) for nid in self.get_N_k() ]
         emd_k = np.average(emd_k_is, weights=self.get_p_k_is())
         return emd_k
     
@@ -414,7 +430,7 @@ class Group:
         for nid in self.N_k:
             cid2_pc_k += self.nid2_cid2_numClasses_is[nid]
         cid2_pc_k = cid2_pc_k / sum(cid2_pc_k)
-        EMD_k = calcEMD(self.cid2_pc_k, self.cid2_pc)
+        EMD_k = self.calcEMD(self.cid2_pc_k, self.cid2_pc)
         return EMD_k
     
     def digest(self, debugging):
