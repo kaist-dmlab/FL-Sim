@@ -34,6 +34,8 @@ class AbstractModel(ABC):
     
     def __init__(self, args, trainData_by1Nid, testData_by1Nid):
         self.args = args
+        self.trainData_by1Nid = trainData_by1Nid
+        self.testData_by1Nid = testData_by1Nid
         self.x_shape = trainData_by1Nid[0]['x'].shape
         
         config = tf.ConfigProto()
@@ -58,9 +60,9 @@ class AbstractModel(ABC):
         with self.graph.as_default():
             self.sess.run(tf.global_variables_initializer())
             
-#             metadata = tf.RunMetadata()
-#             opts = tf.profiler.ProfileOptionBuilder.float_operation()
-#             self.flops = tf.profiler.profile(self.graph, run_meta=metadata, cmd='scope', options=opts).total_float_ops
+            metadata = tf.RunMetadata()
+            opts = tf.profiler.ProfileOptionBuilder.float_operation()
+            self.flopOps = tf.profiler.profile(self.graph, run_meta=metadata, cmd='scope', options=opts).total_float_ops
             
     def __del__(self):
         self.sess.close()
@@ -155,9 +157,9 @@ class AbstractModel(ABC):
                 idxBegin = idxEnd
         return np.mean(losses_), np.mean(accs_)
     
-    def evaluate(self, w, trainData_by1Nid, testData_by1Nid):
-        loss_train, acc_train = self.evaluate_batch(w, trainData_by1Nid[0], len(trainData_by1Nid[0]['x']))
-        loss_test, acc_test = self.evaluate_batch(w, testData_by1Nid[0], self.args.numTestSamples)
+    def evaluate(self, w):
+        loss_train, acc_train = self.evaluate_batch(w, self.trainData_by1Nid[0], len(self.trainData_by1Nid[0]['x']))
+        loss_test, acc_test = self.evaluate_batch(w, self.testData_by1Nid[0], len(self.testData_by1Nid[0]['x']))
         return loss_train, acc_train, loss_test, acc_test
     
     def local_gradients(self, w, dataBatch):

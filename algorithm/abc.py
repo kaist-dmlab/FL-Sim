@@ -12,42 +12,11 @@ import fl_data
 import fl_struct
 import fl_util
 
-PRINT_INTERVAL = 0.5
+LOG_DIR_NAME = 'log'
+EPOCH_CSV_POSTFIX = '_epoch.csv'
+TIME_CSV_POSTFIX = '_time.csv'
 
-def printTimedLogs(fileName):
-    fileEpoch = open('logs/' + fileName + '_epoch.csv', 'r')
-    fileEpoch.readline() # 제목 줄 제외
-    fileTime = open('logs/' + fileName + '_time.csv', 'w', newline='', buffering=1)
-    fwTime = csv.writer(fileTime, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-    fwTime.writerow(['time', 'loss', 'accuracy', 'epoch', 'aggrType'])
-    refDict = {}
-    
-    # 시간 0일 때는 그래프 출력용 초기값 설정을 입력하기 위해, Epoch 1 의 값을 가져옴
-    line = fileEpoch.readline()
-    if not line: return
-    tokens = line.split(',')
-    epoch = tokens[0] ; loss = tokens[1] ; accuracy = tokens[2]
-    refDict[0] = [loss, accuracy, epoch, '']
-    while True:
-        line = fileEpoch.readline()
-        if not line: break
-        line = line.rstrip('\n')
-        tokens = line.split(',')
-        epoch = tokens[0] ; loss = tokens[1] ; accuracy = tokens[2] ; time = tokens[3] ; aggrType = tokens[4]
-        nextTime = np.ceil(float(time)/PRINT_INTERVAL)*PRINT_INTERVAL
-        if not(nextTime in refDict):
-            refDict[nextTime] = [loss, accuracy, epoch, aggrType]
-    maxRefDict = max(refDict)
-    for i in range(100000): # 최대 100000 Time Interval 측정
-        curTime = i * PRINT_INTERVAL
-        if curTime > maxRefDict: break
-        for j in reversed(range(i+1)):
-            prevTime = j * PRINT_INTERVAL
-            if prevTime in refDict: break
-        [loss, accuracy, epoch, aggrType] = refDict[prevTime]
-        fwTime.writerow([curTime, loss, accuracy, epoch, aggrType])
-    fileTime.close()
-    fileEpoch.close()
+PRINT_INTERVAL = 0.5
     
 def groupRandomly(numNodes, numGroups):
     numNodesPerGroup = int(numNodes / numGroups)
@@ -83,20 +52,9 @@ class AbstractAlgorithm(ABC):
 #         print('Num Class per Node Counter:', counter)
         print('Shape of trainData on 1st node:', trainData_byNid[0]['x'].shape, trainData_byNid[0]['y'].shape)
         
-        metadata = { 'numNodes': args.numNodes,
-                    'numEdges': args.numEdges,
-                    'maxTime': args.maxTime,
-                    'sgdEnabled': args.sgdEnabled,
-                    'modelSize': self.model.size,
-                    'lrInitial': args.lrInitial,
-                    'lrDecayRate': args.lrDecayRate,
-                    'numTestSamples': args.numTestSamples,
-                    'batchSize': args.batchSize
-                   }
         fileName = self.getFileName()
         print(fileName)
-        fl_util.dumpJson('logs/' + fileName +'.json', metadata)
-        self.fileEpoch = open('logs/' + fileName + '_epoch.csv', 'w', newline='', buffering=1)
+        self.fileEpoch = open(os.path.join(LOG_DIR_NAME, fileName + EPOCH_CSV_POSTFIX), 'w', newline='', buffering=1)
         self.fwEpoch = csv.writer(self.fileEpoch, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         
         ft = fl_struct.FatTree(self.model.size, self.args.numNodes, self.args.numEdges)
@@ -107,15 +65,142 @@ class AbstractAlgorithm(ABC):
             z_rand = groupRandomly(self.args.numNodes, self.args.numGroups)    
             self.c.digest(z_rand)
         
-    def __del__(self):
-        print()
-        self.fileEpoch.close()
-        fileName = self.getFileName()
-        printTimedLogs(fileName)
-        
-    def getInitVars(self):
-        return self.trainData_by1Nid, self.testData_by1Nid, self.c
+        self.groupTimeMap = {}
+        self.globalTimeMap = {}
+        for b_group in [ 10 ]:
+            d_group = self.getCommTimeGroupExt(b_group)
+            self.groupTimeMap[b_group] = d_group
+        for b_global in [ 10 ]:
+            d_global = self.getCommTimeGlobalExt(b_global)
+            self.globalTimeMap[b_global] = d_global
     
     @abstractmethod
     def run(self):
         pass
+    
+    def __del__(self):
+        self.fileEpoch.close()
+        print()
+        
+        # Largest Flop Ops Idea: https://github.com/TalwalkarLab/leaf/blob/master/models/metrics/visualization_utils.py#L263
+        if self.args.algName == 'cgd':
+            lenLargestData = len(self.trainData_by1Nid[0]['x'])
+        else:
+            lenLargestData = max([ len(self.c.get_nid2_D_i()[nid]['x']) for nid in range(len(self.c.get_N())) ])
+        
+        # Equation for Calculating Flop Ops: https://github.com/TalwalkarLab/leaf/blob/master/models/model.py#L91
+        epochFlopOps = lenLargestData * self.model.flopOps
+        totalComps = self.t * epochFlopOps
+        totalComms = self.getTotalComms()
+        metadata = { 'args': vars(self.args),
+                    'modelFlopOps': self.model.flopOps,
+                    'modelSize': self.model.size,
+                    'numTrainSamples': len(self.trainData_by1Nid[0]['x']),
+                    'numTestSamples': len(self.testData_by1Nid[0]['x']),
+                    'totalComps': totalComps,
+                    'totalComms': totalComms
+                   }
+        fileName = self.getFileName()
+        fl_util.dumpJson(os.path.join(LOG_DIR_NAME, fileName + '.json'), metadata)
+        
+        b_local = 1
+        b_group = 10
+        b_global = 10
+        self.dumpTimeLogs(epochFlopOps, b_local, b_group, b_global)
+        
+    def getApprCommCostGroup(self):
+        return 0
+        
+    def getApprCommCostGlobal(self):
+        return 0
+        
+    def getCommTimeGroupExt(self, b_group):
+        b_group = str(int(b_group/10)) + 'MBps' # 10: fl_struct 참조
+        return self.getCommTimeGroup(b_group)
+        
+    def getCommTimeGroup(self, b_group):
+        return 0
+        
+    def getCommTimeGlobalExt(self, b_global):
+        b_global = str(int(b_global/10)) + 'MBps'
+        return self.getCommTimeGlobal(b_global)
+        
+    def getCommTimeGlobal(self, b_global):
+        return 0
+        
+    def getTotalComms(self):
+        if self.args.algName == 'cgd': return 0
+        
+        fileName = self.getFileName()
+        fileEpoch = open(os.path.join(LOG_DIR_NAME, fileName + EPOCH_CSV_POSTFIX), 'r')
+        line = fileEpoch.readline() # 제목 줄 제외
+        tokens = line.rstrip('\n').split(',')
+        if tokens[3] != 'aggrType': raise Exception(line)
+            
+        cntGroupComms = 0 ; cntGlobalComms = 0
+        while True:
+            line = fileEpoch.readline()
+            if not line: break
+            tokens = line.rstrip('\n').split(',')
+            epoch = tokens[0] ; loss = tokens[1] ; accuracy = tokens[2] ; aggrType = tokens[3]
+            if aggrType == 'Group':
+                cntGroupComms += 1
+            if aggrType == 'Global':
+                cntGlobalComms += 1
+        return cntGroupComms * self.getApprCommCostGroup() + cntGlobalComms * self.getApprCommCostGlobal()
+    
+    def dumpTimeLogs(self, epochFlopOps, b_local, b_group, b_global):
+        d_local = epochFlopOps / (b_local*1000000000) # GHz
+        
+        d_group = self.groupTimeMap[b_group]
+        d_global = self.globalTimeMap[b_global]
+        
+        fileName = self.getFileName()
+        fileEpoch = open(os.path.join(LOG_DIR_NAME, fileName + EPOCH_CSV_POSTFIX), 'r')
+        fileEpoch.readline() # 제목 줄 제외
+        fileTime = open(os.path.join(LOG_DIR_NAME, fileName + TIME_CSV_POSTFIX), 'w', newline='', buffering=1)
+        fwTime = csv.writer(fileTime, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        fwTime.writerow(['time', 'loss', 'accuracy', 'epoch', 'aggrType'])
+        refDict = {}
+        
+        # 시간 0일 때는 그래프 출력용 초기값 설정을 입력하기 위해, 첫번째 Epoch의 값을 가져옴
+        line = fileEpoch.readline()
+        if not line: return
+        tokens = line.rstrip('\n').split(',')
+        epoch = tokens[0] ; loss = tokens[1] ; accuracy = tokens[2] ; aggrType = tokens[3]
+        refDict[0] = [loss, accuracy, epoch, aggrType]
+        
+        isFirstLine = True
+        time = 0
+        while True:
+            if isFirstLine == True:
+                isFirstLine = False
+            else:
+                line = fileEpoch.readline()
+            if not line: break
+            tokens = line.rstrip('\n').split(',')
+            epoch = tokens[0] ; loss = tokens[1] ; accuracy = tokens[2] ; aggrType = tokens[3]
+            if aggrType == '':
+                time += d_local
+            elif aggrType == 'Group':
+                time += d_local + d_group
+            elif aggrType == 'Global':
+                time += d_local + d_global
+            else:
+                raise Exception(aggrType)
+            nextTime = np.ceil(float(time)/PRINT_INTERVAL)*PRINT_INTERVAL
+#             if not(nextTime in refDict):
+            refDict[nextTime] = [loss, accuracy, epoch, aggrType]
+    
+        maxTimeInRefDict = max(refDict)
+        for i in range(100000): # 최대 100000 Time Interval 측정
+            curTime = i * PRINT_INTERVAL
+            if curTime > maxTimeInRefDict: break
+            for j in reversed(range(i+1)):
+                prevTime = j * PRINT_INTERVAL
+                if prevTime in refDict: break
+            [loss, accuracy, epoch, aggrType] = refDict[prevTime]
+            print(curTime, prevTime, epoch)
+            fwTime.writerow([curTime, loss, accuracy, epoch, aggrType])
+        fileTime.close()
+        fileEpoch.close()

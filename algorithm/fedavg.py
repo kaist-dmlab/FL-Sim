@@ -7,36 +7,39 @@ class Algorithm(AbstractAlgorithm):
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
                 + str(self.args.numNodeClasses) + str(self.args.numEdgeClasses) + '_' + str(tau1)
     
+    def getApprCommCostGlobal(self):
+        return self.c.get_hpp_global(False) * 2
+    
+    def getCommTimeGlobal(self, linkSpeed):
+        return self.c.get_d_global(False, linkSpeed) * 2
+    
     def __init__(self, args):
 #         args.numEdgeClasses = 10 # 무조건 처음 edgeType 을 all 로 고정
         super().__init__(args)
     
     def run(self):
-        self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'time', 'aggrType'])
-        (trainData_by1Nid, testData_by1Nid, c) = self.getInitVars()
+        self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'aggrType'])
         
         lr = self.args.lrInitial
         w = self.model.getParams()
-        d_global = c.get_d_global(False) ; d_sum = 0
         
     #     for t2 in range(int(self.args.maxEpoch/tau1)):
         tau1 = int(self.args.opaque1)
         t2 = 0
         while True:
-            (w_byTime, _) = self.model.federated_train(w, c.get_D_is(), lr, tau1, c.get_p_is())
+            (w_byTime, _) = self.model.federated_train(w, self.c.get_D_is(), lr, tau1, self.c.get_p_is())
             w = w_byTime[-1]
             for t1 in range(tau1):
-                t = t2*tau1 + t1 + 1
-                if t % tau1 == 0:
-                    d_sum += d_global
+                self.t = t2*tau1 + t1 + 1
+                if self.t % tau1 == 0:
                     aggrType = 'Global'
                 else:
                     aggrType = ''
-                (loss, _, _, acc) = self.model.evaluate(w_byTime[t1], trainData_by1Nid, testData_by1Nid)
-                print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f\ttime=%.4f\taggrType=%s' % (t, loss, acc, d_sum, aggrType))
-                self.fwEpoch.writerow([t, loss, acc, d_sum, aggrType])
+                (loss, _, _, acc) = self.model.evaluate(w_byTime[t1])
+                print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f\taggrType=%s' % (self.t, loss, acc, aggrType))
+                self.fwEpoch.writerow([self.t, loss, acc, aggrType])
                 
                 lr *= self.args.lrDecayRate
-                if d_sum >= self.args.maxTime: break;
-            if d_sum >= self.args.maxTime: break;
+                if self.t >= self.args.maxEpoch: break;
+            if self.t >= self.args.maxEpoch: break;
             t2 += 1

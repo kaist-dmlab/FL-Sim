@@ -20,6 +20,18 @@ class Algorithm(AbstractAlgorithm):
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
                 + str(self.args.numNodeClasses) + str(self.args.numEdgeClasses) + '_' + str(d_budget)
     
+    def getApprCommCostGroup(self):
+        return self.c.get_hpp_group(True) * 2
+    
+    def getApprCommCostGlobal(self):
+        return self.c.get_hpp_global(True) * 3
+    
+    def getCommTimeGroup(self, linkSpeed):
+        return self.c.get_d_group(True, linkSpeed) * 2
+    
+    def getCommTimeGlobal(self, linkSpeed):
+        return self.c.get_d_global(True, linkSpeed) * 3
+    
     def __init__(self, args):
 #         args.edgeType = 'a' # 무조건 처음 edgeType 을 all 로 고정
         super().__init__(args, randomEnabled=True)
@@ -34,74 +46,68 @@ class Algorithm(AbstractAlgorithm):
         
     def run(self):
         self.fwDelta.writerow(['time', 'cntSteady', 'Delta_star', 'Delta_cur'])
-        self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'time', 'aggrType', 'numGroups', 'tau1', 'tau2'])
-        (trainData_by1Nid, testData_by1Nid, c) = self.getInitVars()
+        self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'aggrType', 'numGroups', 'tau1', 'tau2'])
         
         lr = self.args.lrInitial
-        input_w_ks = [ self.model.getParams() for _ in c.groups ]
-        d_global = c.get_d_global(True) ; d_group = c.get_d_group(True) ; d_sum = 0
+        input_w_ks = [ self.model.getParams() for _ in self.c.groups ]
         d_budget = self.args.opaque1
+        numGroups = len(self.c.groups)
         
     #     for t3 in range(int(self.args.maxEpoch/(tau1*tau2))):
-        t = 0 ; t_prev = 0 ; tau1 = 5 ; tau2 = 2 ; t3 = 0
+        self.t = 0 ; t_prev = 0 ; tau1 = 1 ; tau2 = 1 ; t3 = 0
         while True:
             for t2 in range(tau2):
                 w_is = []
                 w_k_byTime_byGid = []
                 output_w_ks = []
-                for k, g in enumerate(c.groups): # Group Aggregation
+                for k, g in enumerate(self.c.groups): # Group Aggregation
                     w_k = input_w_ks[k]
                     (w_k_byTime, w_k_is) = self.model.federated_train(w_k, g.get_D_k_is(), lr, tau1, g.get_p_k_is())
                     w_is += w_k_is
                     w_k_byTime_byGid.append(w_k_byTime)
                     output_w_ks.append(w_k_byTime[-1])
                 input_w_ks = output_w_ks
-                w_byTime = self.model.federated_aggregate(w_k_byTime_byGid, c.get_p_ks()) # Global Aggregation
+                w_byTime = self.model.federated_aggregate(w_k_byTime_byGid, self.c.get_p_ks()) # Global Aggregation
                 for t1 in range(tau1):
-                    t += 1
+                    self.t += 1
                     if (t-t_prev) % tau1 == 0 and not((t-t_prev) % (tau1*tau2)) == 0:
-                        d_sum += d_group
                         aggrType = 'Group'
                     elif (t-t_prev) % (tau1*tau2) == 0:
-                        d_sum += d_global
                         aggrType = 'Global'
                     else:
                         aggrType = ''
-                    (loss, _, _, acc) = self.model.evaluate(w_byTime[t1], trainData_by1Nid, testData_by1Nid)
-                    print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f\ttime=%.4f\taggrType=%s\tnumGroups=%d\ttau1=%d\ttau2=%d'
-                          % (t, loss, acc, d_sum, aggrType, len(c.groups), tau1, tau2))
-                    self.fwEpoch.writerow([t, loss, acc, d_sum, aggrType, len(c.groups), tau1, tau2])
+                    (loss, _, _, acc) = self.model.evaluate(w_byTime[t1])
+                    print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f\taggrType=%s\tnumGroups=%d\ttau1=%d\ttau2=%d'
+                          % (self.t, loss, acc, aggrType, numGroups, tau1, tau2))
+                    self.fwEpoch.writerow([self.t, loss, acc, aggrType, numGroups, tau1, tau2])
                     
                     lr *= self.args.lrDecayRate
-    #                 if t >= self.args.maxEpoch: break
-    #             if t >= self.args.maxEpoch: break
-    #         if t >= self.args.maxEpoch: break
-                    if d_sum >= self.args.maxTime: break;
-                if d_sum >= self.args.maxTime: break;
-            if d_sum >= self.args.maxTime: break;
+                    if self.t >= self.args.maxEpoch: break;
+                if self.t >= self.args.maxEpoch: break;
+            if self.t >= self.args.maxEpoch: break;
                 
             w = w_byTime[-1] # 출력을 위해 매 시간마다 수행했던 Global Aggregation 의 마지막 시간 값만 추출
-            input_w_ks = [ w for _ in c.groups ]
+            input_w_ks = [ w for _ in self.c.groups ]
             
             if t3 % GROUPING_INTERVAL == 0:
                 # Gradient Estimation
-                (g_is__w, nid2_g_i__w) = self.model.federated_collect_gradients(w, c.get_nid2_D_i())
-    #             (g_is__w2, nid2_g_i__w2) = self.model.federated_collect_gradients2(w, c.get_nid2_D_i())
+                (g_is__w, nid2_g_i__w) = self.model.federated_collect_gradients(w, self.c.get_nid2_D_i())
+    #             (g_is__w2, nid2_g_i__w2) = self.model.federated_collect_gradients2(w, self.c.get_nid2_D_i())
     #             for nid in nid2_g_i__w:
     #                 print(self.model.np_modelEquals(g_is__w[nid], g_is__w2[nid]), self.model.np_modelEquals(nid2_g_i__w[nid], nid2_g_i__w2[nid]))
-                g__w = np.average(g_is__w, axis=0, weights=c.get_p_is())
+                g__w = np.average(g_is__w, axis=0, weights=self.c.get_p_is())
         
-#                 D_is = c.get_D_is()
+#                 D_is = self.c.get_D_is()
 #                 p_is = [ len(np.unique(D_i['y'])) for D_i in D_is ]
 #                 print(p_is)
-#                 p_is = [ 1 for _ in range(len(c.get_N())) ]
-#                 c.set_p_is(p_is)
-#                 c.digest(c.z)
+#                 p_is = [ 1 for _ in range(len(self.c.get_N())) ]
+#                 self.c.set_p_is(p_is)
+#                 self.c.digest(self.c.z)
         
                 # IID Grouping
-#                 c = self.run_IID_Weighting(c, nid2_g_i__w, g__w)
-                (c, tau1, tau2, d_group, d_global) = self.run_IID_Grouping(c, nid2_g_i__w, g__w, d_budget)
-            t_prev = t # Mark Time
+#                 c = self.run_IID_Weighting(self.cc, nid2_g_i__w, g__w)
+                (self.c, tau1, tau2) = self.run_IID_Grouping(self.c, nid2_g_i__w, g__w, d_budget)
+            t_prev = self.t # Mark Time
             t3 += 1
             
     def run_IID_Weighting(self, c, nid2_g_i__w, g__w, mode=1):
@@ -248,7 +254,7 @@ class Algorithm(AbstractAlgorithm):
         print('Final DELTA_star=%.4f, tau1=%d, tau2=%d' % (DELTA_star, tau1, tau2))
         
         print('IID Grouping Finished')
-        return c_star, tau1, tau2, d_group, d_global
+        return c_star, tau1, tau2
     
     def iterate_IID_Grouping(self, c, nid2_g_i__w, g__w):
         DELTA_cur = c.get_DELTA(nid2_g_i__w, g__w)

@@ -57,10 +57,6 @@ def parseArgs():
                     help='maxEpoch',
                     type=int,
                     default=1000)
-    parser.add_argument('--maxTime',
-                    help='maxTime',
-                    type=int,
-                    default=-1)
     parser.add_argument('--lrInitial',
                     help='lrInitial',
                     type=float,
@@ -69,10 +65,6 @@ def parseArgs():
                     help='lrDecayRate',
                     type=int,
                     default=0.99)
-    parser.add_argument('--numTestSamples',
-                    help='numTestSamples',
-                    type=int,
-                    default=10000)
     parser.add_argument('--batchSize',
                     help='batchSize',
                     type=int,
@@ -83,31 +75,26 @@ def parseArgs():
                     default=False)
     args = parser.parse_args()
     
-    if args.modelName == 'svm':
-        args.maxTime = 25
-        args.lrInitial = 0.01
-    elif args.modelName == 'sr':
-        args.maxTime = 50
-        if args.dataName == 'cifar10': # sr, cifar10 의 경우는 데이터에 비해 모델이 너무 단순해서 실험에서 제외
-            raise Exception(args.modelName, args.dataName)
+    if args.modelName == 'sr':
+        args.maxEpoch = 1500
+        # sr, cifar10 의 경우는 데이터에 비해 모델이 너무 단순해서 실험에서 제외
+        if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
     elif args.modelName == '1nn':
         args.sgdEnabled = True
-        args.maxTime = 250
+        args.maxEpoch = 500
+        if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
     elif args.modelName == '2nn':
         args.sgdEnabled = True
-        args.maxTime = 500
+        args.maxEpoch = 500
+        if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
     elif args.modelName == 'cnn':
         args.sgdEnabled = True
-        if args.dataName == 'mnist-o' or args.dataName == 'mnist-f' or args.dataName == 'femnist' or args.dataName == 'celeba':
-            args.maxTime = 1000
-        else:
-            raise Exception(args.modelName, args.dataName)
-    elif args.modelName == 'resnet':
-        args.sgdEnabled = True
-        args.maxTime = 10000
-        args.batchSize = 256
-        if args.dataName != 'cifar10': # 'resnet' 은 cifar10 만 지원
-            raise Exception(args.modelName, args.dataName)
+        args.maxEpoch = 500
+#     elif args.modelName == 'resnet':
+#         args.sgdEnabled = True
+#         args.batchSize = 256
+#         if args.dataName != 'cifar10': # 'resnet' 은 cifar10 만 지원
+#             raise Exception(args.modelName, args.dataName)
     else:
         raise Exception(args.modelName)
     return args

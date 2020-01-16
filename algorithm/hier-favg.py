@@ -8,13 +8,23 @@ class Algorithm(AbstractAlgorithm):
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
                 + str(self.args.numNodeClasses) + str(self.args.numEdgeClasses) + '_' + str(tau1) + '_' + str(tau2)
     
+    def getApprCommCostGroup(self):
+        return self.c.get_hpp_group(False) * 2
+    
+    def getApprCommCostGlobal(self):
+        return self.c.get_hpp_global(False) * 2
+    
+    def getCommTimeGroup(self, linkSpeed):
+        return self.c.get_d_group(False, linkSpeed) * 2
+    
+    def getCommTimeGlobal(self, linkSpeed):
+        return self.c.get_d_global(False, linkSpeed) * 2
+    
     def run(self):
-        self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'time', 'aggrType'])
-        (trainData_by1Nid, testData_by1Nid, c) = self.getInitVars()
+        self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'aggrType'])
         
         lr = self.args.lrInitial
-        input_w_ks = [ self.model.getParams() for _ in c.groups ]
-        d_global = c.get_d_global(True) ; d_group = c.get_d_group(True) ; d_sum = 0
+        input_w_ks = [ self.model.getParams() for _ in self.c.groups ]
         
     #     for t3 in range(int(self.args.maxEpoch/(tau1*tau2))):
         tau1 = int(self.args.opaque1)
@@ -24,38 +34,36 @@ class Algorithm(AbstractAlgorithm):
             for t2 in range(tau2):
                 w_k_byTime_byGid = []
                 output_w_ks = []
-                for k, g in enumerate(c.groups): # Group Aggregation
+                for k, g in enumerate(self.c.groups): # Group Aggregation
                     w_k = input_w_ks[k]
                     (w_k_byTime, _) = self.model.federated_train(w_k, g.get_D_k_is(), lr, tau1, g.get_p_k_is())
                     w_k_byTime_byGid.append(w_k_byTime)
                     output_w_ks.append(w_k_byTime[-1])
                 input_w_ks = output_w_ks
-                w_byTime = self.model.federated_aggregate(w_k_byTime_byGid, c.get_p_ks()) # Global Aggregation
+                w_byTime = self.model.federated_aggregate(w_k_byTime_byGid, self.c.get_p_ks()) # Global Aggregation
                 for t1 in range(tau1):
-                    t = t3*tau1*tau2 + t2*tau1 + t1 + 1
-                    if t % tau1 == 0 and not(t % (tau1*tau2)) == 0:
-                        d_sum += d_group
+                    self.t = t3*tau1*tau2 + t2*tau1 + t1 + 1
+                    if self.t % tau1 == 0 and not(self.t % (tau1*tau2)) == 0:
                         aggrType = 'Group'
-                    elif t % (tau1*tau2) == 0:
-                        d_sum += d_global
+                    elif self.t % (tau1*tau2) == 0:
                         aggrType = 'Global'
                     else:
                         aggrType = ''
-                    (loss, _, _, acc) = self.model.evaluate(w_byTime[t1], trainData_by1Nid, testData_by1Nid)
-                    print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f\ttime=%.4f\taggrType=%s' % (t, loss, acc, d_sum, aggrType))
-                    self.fwEpoch.writerow([t, loss, acc, d_sum, aggrType])
+                    (loss, _, _, acc) = self.model.evaluate(w_byTime[t1])
+                    print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f\taggrType=%s' % (self.t, loss, acc, aggrType))
+                    self.fwEpoch.writerow([self.t, loss, acc, aggrType])
                     
                     lr *= self.args.lrDecayRate
-                    if d_sum >= self.args.maxTime: break;
-                if d_sum >= self.args.maxTime: break;
-            if d_sum >= self.args.maxTime: break;
+                    if self.t >= self.args.maxEpoch: break;
+                if self.t >= self.args.maxEpoch: break;
+            if self.t >= self.args.maxEpoch: break;
             t3 += 1
             
             w = w_byTime[-1]
-            input_w_ks = [ w for _ in c.groups ]
+            input_w_ks = [ w for _ in self.c.groups ]
             
             # 실험 출력용 Delta 계산
-    #        (g_is__w, nid2_g_i__w) = self.model.federated_collect_gradients(w, c.get_nid2_D_i())
-    #        g__w = np.average(g_is__w, axis=0, weights=c.get_p_is())
-    #        Delta = c.get_Delta(nid2_g_i__w, g__w)
+    #        (g_is__w, nid2_g_i__w) = self.model.federated_collect_gradients(w, self.c.get_nid2_D_i())
+    #        g__w = np.average(g_is__w, axis=0, weights=self.c.get_p_is())
+    #        Delta = self.c.get_Delta(nid2_g_i__w, g__w)
     #        print(Delta)

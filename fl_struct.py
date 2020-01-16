@@ -11,12 +11,13 @@ import os
 import fl_data
 import fl_struct
 
-# LINK_SPEED = '10Mbps', SIM_SIM_DATA_SIZE = 40000 도 비슷한 결과라서 시뮬레이션 빨리 하기 위해 SIM_DATA_SIZE 를 낮춤
+# LINK_SPEED = '10Mbps', SIM_DATA_SIZE = 40000 도 비슷한 결과라서 시뮬레이션 빨리 하기 위해 SIM_DATA_SIZE 를 낮춤
 # 시뮬레이션은 SIM_DATA_SIZE 크기가 클 수록 패킷 수가 늘어나서 오래걸림
 # 자세한 결과는 test-struct.ipynb 참조
 LINK_SPEED = '1MBps'
 LINK_DELAY = '1ms'
 SIM_DATA_SIZE = 4000
+PACKET_SIZE = 1000
 PORT = 9
 STOP_TIME = 10.0
 
@@ -68,17 +69,35 @@ class FatTree:
         # Initialize hop distance
         self.dist = { nid1: { nid2: len(nx.shortest_path(self.g, nid1, nid2)) - 1 for nid2 in range(self.numNodes) } for nid1 in range(self.numNodes) }
         
-    def simulate(self, subject, commPairs, edgeCombineEnabled, linkSpeed=LINK_SPEED, simDataSize=SIM_DATA_SIZE):
+    def combineCommPairs(self, commPairs):
+        # 현재 통신 Src 중 같은 Edge 에 속하며 같은 Dst 을 가지는 것에 대해 하나만 Src 로 Combine
+        combinedCommPairs = {}
+        for commPair in commPairs:
+            srcNid = commPair[0]
+            dstNid = commPair[1]
+            srcEid = self.nid2eid[srcNid]
+            if not((srcEid, dstNid) in combinedCommPairs):
+                combinedCommPairs[(srcEid, dstNid)] = [srcNid, dstNid]
+        commPairs = list(combinedCommPairs.values())
+        return commPairs
+    
+    def getSumOfHopsPerPacket(self, commPairs, edgeCombineEnabled):
         if edgeCombineEnabled:
-            # 현재 통신 Src 중 같은 Edge 에 속하며 같은 Dst 을 가지는 것에 대해 하나만 Src 로 Combine
-            combinedCommPairs = {}
-            for commPair in commPairs:
-                srcNid = commPair[0]
-                dstNid = commPair[1]
-                srcEid = self.nid2eid[srcNid]
-                if not((srcEid, dstNid) in combinedCommPairs):
-                    combinedCommPairs[(srcEid, dstNid)] = [srcNid, dstNid]
-            commPairs = list(combinedCommPairs.values())
+            commPairs = self.combineCommPairs(commPairs)
+        
+        numPackets = self.modelSize / PACKET_SIZE
+        commPairs = np.array(commPairs)
+        sumHPPs = 0
+        for commPair in commPairs:
+            srcNid = commPair[0]
+            dstNid = commPair[1]
+            dist = self.getDistance(srcNid, dstNid)
+            sumHPPs += dist / numPackets
+        return sumHPPs
+        
+    def simulate(self, subject, commPairs, edgeCombineEnabled, linkSpeed):
+        if edgeCombineEnabled:
+            commPairs = self.combineCommPairs(commPairs)
             
         def removeFilesInDir(dirPath):
             for f in os.listdir(dirPath):
@@ -161,11 +180,11 @@ class FatTree:
             srcNid = commPair[0]
             dstNid = commPair[1]
             sourceHelper = ns.applications.BulkSendHelper('ns3::TcpSocketFactory', ns.network.InetSocketAddress(self.xips[dstNid], PORT))
-            sourceHelper.SetAttribute('MaxBytes', ns.core.UintegerValue(simDataSize))
+            sourceHelper.SetAttribute('MaxBytes', ns.core.UintegerValue(SIM_DATA_SIZE))
             sourceApps = sourceHelper.Install(nodes.Get(srcNid))
             sourceApps.Start(ns.core.Seconds(0.0))
             sourceApps.Stop(ns.core.Seconds(STOP_TIME))
-            totalBytesSent += simDataSize
+            totalBytesSent += SIM_DATA_SIZE
             
         sinkAppsList = []
         for dstNid in np.unique(commPairs[:,1]):
@@ -194,7 +213,7 @@ class FatTree:
             else:
                 return float(lastLine.split()[0])
         def toSec(d):
-            # 10: Network Simulation 을 빨리 하기 위해 1MBps/1000크기(10MBps/10000크기와 유사한 결과)로 했으며, 따라서 데이터 크기를 10 더 나눠줌
+            # 10: Network Simulation 을 빨리 하기 위해 1MBps/1000크기(10MBps/10000크기와 유사한 결과)로 했으므로 데이터 크기를 10 더 나눠줌
             return d / (SIM_DATA_SIZE * 10) * self.modelSize
         #print('Total Bytes Received :', sum( ns.applications.PacketSink(sinkApps.Get(0)).GetTotalRx() for sinkApps in sinkAppsList ))
         maxPcapTime = max( getPcapTime('pcap/' + fileName) for fileName in os.listdir('pcap') )
@@ -269,16 +288,24 @@ class Cloud:
         if self.ready == False: raise Exception
         return list(self.nid2_D_i.values()) # 순서가 중요하지 않을 때 list 반환
     
-    def get_d_global(self, edgeCombineEnabled):
+    def get_d_global(self, edgeCombineEnabled, linkSpeed=LINK_SPEED):
         if self.ready == False: raise Exception
-        return self.ft.simulate('d_global', [ [nid, self.ps_nid] for nid in self.N ], edgeCombineEnabled)
+        return self.ft.simulate('d_global', [ [nid, self.ps_nid] for nid in self.N ], edgeCombineEnabled, linkSpeed)
     
-    def get_d_group(self, edgeCombineEnabled):
+    def get_d_group(self, edgeCombineEnabled, linkSpeed=LINK_SPEED):
         if self.ready == False: raise Exception
         commPairs = []
         for g in self.groups:
             commPairs += [ [nid, g.ps_nid] for nid in g.get_N_k() ]
-        return self.ft.simulate('d_group', commPairs, edgeCombineEnabled)
+        return self.ft.simulate('d_group', commPairs, edgeCombineEnabled, linkSpeed)
+    
+    def get_hpp_global(self, edgeCombineEnabled):
+        if self.ready == False: raise Exception
+        return self.ft.getSumOfHopsPerPacket([ [nid, self.ps_nid] for nid in self.N ], edgeCombineEnabled)
+    
+    def get_hpp_group(self, edgeCombineEnabled):
+        if self.ready == False: raise Exception
+        return max([ self.ft.getSumOfHopsPerPacket([ [nid, g.ps_nid] for nid in g.get_N_k() ], edgeCombineEnabled) for g in self.groups ])
     
     def get_delta(self, nid2_g_i__w):
         if self.ready == False: raise Exception
