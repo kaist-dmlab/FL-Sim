@@ -5,17 +5,13 @@ class Algorithm(AbstractAlgorithm):
     def getFileName(self):
         tau1 = int(self.args.opaque1)
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + str(self.args.numNodeClasses) + str(self.args.numEdgeClasses) + '_' + str(tau1)
+                + str(self.args.nodeType) + str(self.args.edgeType) + '_' + str(tau1)
     
     def getApprCommCostGlobal(self):
         return self.c.get_hpp_global(False) * 2
     
     def getCommTimeGlobal(self, linkSpeed):
         return self.c.get_d_global(False, linkSpeed) * 2
-    
-    def __init__(self, args):
-#         args.numEdgeClasses = 10 # 무조건 처음 edgeType 을 all 로 고정
-        super().__init__(args)
     
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'aggrType'])

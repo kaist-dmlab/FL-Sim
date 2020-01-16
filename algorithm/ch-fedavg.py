@@ -18,7 +18,7 @@ class Algorithm(AbstractAlgorithm):
     def getFileName(self):
         d_budget = self.args.opaque1
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + str(self.args.numNodeClasses) + str(self.args.numEdgeClasses) + '_' + str(d_budget)
+                + str(self.args.nodeType) + str(self.args.edgeType) + '_' + str(d_budget)
     
     def getApprCommCostGroup(self):
         return self.c.get_hpp_group(True) * 2
@@ -33,7 +33,6 @@ class Algorithm(AbstractAlgorithm):
         return self.c.get_d_global(True, linkSpeed) * 3
     
     def __init__(self, args):
-#         args.edgeType = 'a' # 무조건 처음 edgeType 을 all 로 고정
         super().__init__(args, randomEnabled=True)
         
         fileName = self.getFileName()
@@ -268,6 +267,7 @@ class Algorithm(AbstractAlgorithm):
         np.random.shuffle(idx_Nid2)
         idx_Nid2 = idx_Nid2[:GROUPING_NUM_SAMPLE_NODE]
 
+        numTotalClasses = len(np.unique(self.trainData_by1Nid[0]['y']))
         z = c.z
         for i in idx_Nid1:
             for j in idx_Nid2:
@@ -281,7 +281,7 @@ class Algorithm(AbstractAlgorithm):
                 
                 nids_byGid = fl_data.to_nids_byGid(z)
                 numClassesPerGroup = np.mean([ len(np.unique(np.concatenate([c.D_byNid[nid]['y'] for nid in nids]))) for nids in nids_byGid ])
-                if numClassesPerGroup != 10:
+                if numClassesPerGroup != numTotalClasses:
                     # 데이터 분포가 IID 가 아니게 될 경우, 다시 원래대로 그룹 멤버쉽 초기화
                     temp_k = z[i]
                     z[i] = z[j]

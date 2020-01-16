@@ -14,21 +14,23 @@ def parseArgs():
     parser.add_argument('--dataName',
                     help='dataName',
                     type=str,
-                    choices=['mnist-o', 'mnist-f', 'cifar10', 'femnist', 'celeba'],
+                    choices=['mnist-o', 'mnist-f', 'femnist', 'celeba'], # cifar10 제외
                     required=True)
     parser.add_argument('--algName',
                     help='algName',
                     type=str,
                     choices=['cgd', 'fedavg', 'hier-favg', 'ch-fedavg'],
                     required=True)
-    parser.add_argument('--numNodeClasses',
-                    help='numNodeClasses',
-                    type=int,
+    parser.add_argument('--nodeType',
+                    help='nodeType',
+                    type=str,
+                    choices=['o', 'q', 'h', 'a'],
                     required=True)
-    parser.add_argument('--numEdgeClasses',
-                    help='numEdgeClasses',
-                    type=int,
-                    required=True)
+    parser.add_argument('--edgeType',
+                    help='edgeType',
+                    type=str,
+                    choices=['o', 'q', 'h', 'a'],
+                    default='a')
     parser.add_argument('--opaque1',
                     help='opaque1',
                     type=float,

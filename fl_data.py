@@ -173,19 +173,39 @@ def sample_truncated_normal(mean=1, sd=1, low=1, upp=10, size=1):
         sampled = [int(a) for a in np.rint(sampled)]
     return sampled
 
-
 def groupByNode(data_by1Nid, nodeType, numNodes):
-    NUM_CLASS = len(np.unique(data_by1Nid[0]['y']))
-    data_byNid, z = groupByEdge(data_by1Nid, nodeType, NUM_CLASS, numNodes, 1)
+    data_byNid, z = groupByEdge(data_by1Nid, nodeType, 'a', numNodes, 1)
     return data_byNid
 
 def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
     np.random.seed(1234)
     trainData_by1Nid = data_by1Nid
     NUM_CLASS = len(np.unique(trainData_by1Nid[0]['y']))
-
-    NUM_CLASS_NODE = nodeType # average # of class in each node
-    NUM_CLASS_EDGE = edgeType # average # of class in each edge
+    
+    # average # of class in each node
+    if nodeType == 'o':
+        NUM_CLASS_NODE = 1
+    elif nodeType == 'q':
+        NUM_CLASS_NODE = max(NUM_CLASS/4, 1)
+    elif nodeType == 'h':
+        NUM_CLASS_NODE = max(NUM_CLASS/2, 1)
+    elif nodeType == 'a':
+        NUM_CLASS_NODE = NUM_CLASS
+    else:
+        raise Exception(nodeType)
+    
+    # average # of class in each edge
+    if edgeType == 'o':
+        NUM_CLASS_EDGE = 1
+    elif edgeType == 'q':
+        NUM_CLASS_EDGE = max(NUM_CLASS/4, 1)
+    elif edgeType == 'h':
+        NUM_CLASS_EDGE = max(NUM_CLASS/2, 1)
+    elif edgeType == 'a':
+        NUM_CLASS_EDGE = NUM_CLASS
+    else:
+        raise Exception(edgeType)
+    print(NUM_CLASS_NODE, NUM_CLASS_EDGE)
     assert(NUM_CLASS_NODE <= NUM_CLASS_EDGE)
 
     NUM_NODES = numNodes

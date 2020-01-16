@@ -13,8 +13,8 @@ import fl_struct
 import fl_util
 
 LOG_DIR_NAME = 'log'
-EPOCH_CSV_POSTFIX = '_epoch.csv'
-TIME_CSV_POSTFIX = '_time.csv'
+EPOCH_CSV_POSTFIX = 'epoch.csv'
+TIME_CSV_POSTFIX = 'time.csv'
 
 PRINT_INTERVAL = 0.5
     
@@ -44,7 +44,7 @@ class AbstractAlgorithm(ABC):
         Model = getattr(modelModule, 'Model')
         self.model = Model(self.args, self.trainData_by1Nid, self.testData_by1Nid)
         
-        (trainData_byNid, z_edge) = fl_data.groupByEdge(self.trainData_by1Nid, self.args.numNodeClasses, self.args.numEdgeClasses, self.args.numNodes, self.args.numEdges)
+        (trainData_byNid, z_edge) = fl_data.groupByEdge(self.trainData_by1Nid, self.args.nodeType, self.args.edgeType, self.args.numNodes, self.args.numEdges)
 #         print('Num Data per Node:', [ len(D_i['x']) for D_i in trainData_byNid ])
 #         numClassPerNodeList = [ len(np.unique(D_i['y'])) for D_i in trainData_byNid ]
 #         print('Num Class per Node:', numClassPerNodeList)
@@ -54,7 +54,7 @@ class AbstractAlgorithm(ABC):
         
         fileName = self.getFileName()
         print(fileName)
-        self.fileEpoch = open(os.path.join(LOG_DIR_NAME, fileName + EPOCH_CSV_POSTFIX), 'w', newline='', buffering=1)
+        self.fileEpoch = open(os.path.join(LOG_DIR_NAME, fileName + '_' + EPOCH_CSV_POSTFIX), 'w', newline='', buffering=1)
         self.fwEpoch = csv.writer(self.fileEpoch, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         
         ft = fl_struct.FatTree(self.model.size, self.args.numNodes, self.args.numEdges)
@@ -103,10 +103,11 @@ class AbstractAlgorithm(ABC):
         fileName = self.getFileName()
         fl_util.dumpJson(os.path.join(LOG_DIR_NAME, fileName + '.json'), metadata)
         
-        b_local = 1
-        b_group = 10
-        b_global = 10
-        self.dumpTimeLogs(epochFlopOps, b_local, b_group, b_global)
+        if self.args.algName != 'cgd':
+            b_local = 1
+            b_group = 10
+            b_global = 10
+            self.dumpTimeLogs(epochFlopOps, b_local, b_group, b_global)
         
     def getApprCommCostGroup(self):
         return 0
@@ -132,7 +133,7 @@ class AbstractAlgorithm(ABC):
         if self.args.algName == 'cgd': return 0
         
         fileName = self.getFileName()
-        fileEpoch = open(os.path.join(LOG_DIR_NAME, fileName + EPOCH_CSV_POSTFIX), 'r')
+        fileEpoch = open(os.path.join(LOG_DIR_NAME, fileName + '_' + EPOCH_CSV_POSTFIX), 'r')
         line = fileEpoch.readline() # 제목 줄 제외
         tokens = line.rstrip('\n').split(',')
         if tokens[3] != 'aggrType': raise Exception(line)
@@ -156,9 +157,9 @@ class AbstractAlgorithm(ABC):
         d_global = self.globalTimeMap[b_global]
         
         fileName = self.getFileName()
-        fileEpoch = open(os.path.join(LOG_DIR_NAME, fileName + EPOCH_CSV_POSTFIX), 'r')
+        fileEpoch = open(os.path.join(LOG_DIR_NAME, fileName + '_' + EPOCH_CSV_POSTFIX), 'r')
         fileEpoch.readline() # 제목 줄 제외
-        fileTime = open(os.path.join(LOG_DIR_NAME, fileName + TIME_CSV_POSTFIX), 'w', newline='', buffering=1)
+        fileTime = open(os.path.join(LOG_DIR_NAME, fileName + '_' + str(b_local) + '_' + str(b_group) + '_' + str(b_global) + '_' + TIME_CSV_POSTFIX), 'w', newline='', buffering=1)
         fwTime = csv.writer(fileTime, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         fwTime.writerow(['time', 'loss', 'accuracy', 'epoch', 'aggrType'])
         refDict = {}
