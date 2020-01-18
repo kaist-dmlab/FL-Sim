@@ -184,7 +184,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
     
     # average # of class in each node
     if nodeType == 'o':
-        NUM_CLASS_NODE = 1
+        NUM_CLASS_NODE = max(NUM_CLASS/10, 1)
     elif nodeType == 'q':
         NUM_CLASS_NODE = max(NUM_CLASS/4, 1)
     elif nodeType == 'h':
@@ -196,7 +196,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
     
     # average # of class in each edge
     if edgeType == 'o':
-        NUM_CLASS_EDGE = 1
+        NUM_CLASS_EDGE = max(NUM_CLASS/10, 1)
     elif edgeType == 'q':
         NUM_CLASS_EDGE = max(NUM_CLASS/4, 1)
     elif edgeType == 'h':
@@ -205,33 +205,64 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
         NUM_CLASS_EDGE = NUM_CLASS
     else:
         raise Exception(edgeType)
-    print(NUM_CLASS_NODE, NUM_CLASS_EDGE)
     assert(NUM_CLASS_NODE <= NUM_CLASS_EDGE)
 
     NUM_NODES = numNodes
     NUM_EDGES = numEdges
     NUM_NODES_PER_EDGE = int(NUM_NODES / NUM_EDGES)
-    assert(NUM_NODES % NUM_EDGES == 0)    
+    assert(NUM_NODES % NUM_EDGES == 0)
+    
+    NUM_DATA_CLASS = [ len(x['x']) for x in groupByClass(data_by1Nid) ]
+    choice_prob = np.array(NUM_DATA_CLASS)/np.sum(NUM_DATA_CLASS)
     
     EDGE_CLASS_LIST_UNIQUE = np.zeros(NUM_CLASS-1).tolist()
-    while(len(EDGE_CLASS_LIST_UNIQUE)!=NUM_CLASS): # check whether all class are sampled at least once
+    while(len(EDGE_CLASS_LIST_UNIQUE)!=NUM_CLASS): # check whether all class are sampled at least once in all nodes
         EDGE_CLASS_LIST = []
         EDGE_NODE_CLASS_LIST = []
         
+        
+        ########### New CODE 20200117 #################
         NUM_CLASS_EDGE_SAMPLED_MEAN = -100
         
         while(np.abs(NUM_CLASS_EDGE_SAMPLED_MEAN - NUM_CLASS_EDGE)>0.1): # mean error should be lower than 0.1
-            NUM_CLASS_EDGE_SAMPLED = sample_truncated_normal(mean=NUM_CLASS_EDGE, sd=1, low=1, upp=10, size=NUM_EDGES)
+            NUM_CLASS_EDGE_SAMPLED = sample_truncated_normal(mean=NUM_CLASS_EDGE, sd=1, low=1, upp=NUM_CLASS, size=NUM_EDGES)
             NUM_CLASS_EDGE_SAMPLED_MEAN = np.mean(NUM_CLASS_EDGE_SAMPLED)
-    
-        for i in range(NUM_EDGES):
-            class_list = np.random.choice(list(range(NUM_CLASS)), NUM_CLASS_EDGE_SAMPLED[i], replace=False).tolist()
+        
+        
+        class_left = set(list(range(NUM_CLASS)))
+        num_allocated_edges = 0
+        
+        while(len(class_left) != 0): # check whether all class are sampled at least once in all edges
+            if NUM_CLASS_EDGE_SAMPLED[num_allocated_edges] > len(class_left):
+                class_list = list(class_left)
+                class_left_complement_list = list(set(range(NUM_CLASS)).difference(class_left))
+                p = choice_prob[class_left_complement_list]/np.sum(choice_prob[class_left_complement_list])
+                class_list_rest = np.random.choice(class_left_complement_list, NUM_CLASS_EDGE_SAMPLED[num_allocated_edges]-len(class_list), replace=False, p=p).tolist()
+                class_list += class_list_rest
+            else:
+                p = choice_prob[list(class_left)]/np.sum(choice_prob[list(class_left)])
+                class_list = np.random.choice(list(class_left), NUM_CLASS_EDGE_SAMPLED[num_allocated_edges], replace=False, p=p).tolist()
+            EDGE_CLASS_LIST.append(class_list)
+            EDGE_NODE_CLASS_LIST.append([])
+            class_left.difference_update(set(class_list))
+            num_allocated_edges += 1
+
+        for i in range(NUM_EDGES-num_allocated_edges):
+            i += num_allocated_edges
+            class_list = np.random.choice(list(range(NUM_CLASS)), NUM_CLASS_EDGE_SAMPLED[i], replace=False, p=choice_prob).tolist()
             EDGE_CLASS_LIST.append(class_list)
             EDGE_NODE_CLASS_LIST.append([])
         EDGE_CLASS_LIST_UNIQUE = np.unique([item for sublist in EDGE_CLASS_LIST for item in sublist])
-
+        ########### New CODE 20200117 #################
+        
+#         for i in range(NUM_EDGES):
+#             class_list = np.random.choice(list(range(NUM_CLASS)), NUM_CLASS_EDGE_SAMPLED[i], replace=False, p=choice_prob).tolist()
+#             EDGE_CLASS_LIST.append(class_list)
+#             EDGE_NODE_CLASS_LIST.append([])
+#         EDGE_CLASS_LIST_UNIQUE = np.unique([item for sublist in EDGE_CLASS_LIST for item in sublist])
+        
+        
     NODE_CLASS_LIST_UNIQUE = np.zeros(NUM_CLASS-1).tolist()
-    
     NODE_CLASS_NUM_SAMPLED_MEAN = -100
     SEARCH_LIMIT = 0
     min_error = 100000
@@ -240,16 +271,52 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
             break
         SEARCH_LIMIT += 1
         
-        for i in range(NUM_EDGES):
-            edge_class_list = EDGE_CLASS_LIST[i]
-            EDGE_CLASS_LIST_REAL_FLAT = np.zeros(NUM_CLASS+1)
-            while (len(EDGE_CLASS_LIST_REAL_FLAT) != len(EDGE_CLASS_LIST[i])): # check whether all nodes in a edge sample all class assigned to the edge
-                EDGE_NODE_CLASS_LIST[i] = []
-                for j in range(NUM_NODES_PER_EDGE):
-                    num_class_in_node = sample_truncated_normal(mean=NUM_CLASS_NODE, sd=1, low=1, upp=len(edge_class_list),size=1)
-                    class_in_node = np.random.choice(edge_class_list, num_class_in_node, replace=False).tolist()
-                    EDGE_NODE_CLASS_LIST[i].append(class_in_node)
-                EDGE_CLASS_LIST_REAL_FLAT = np.unique([item for sublist in EDGE_NODE_CLASS_LIST[i] for item in sublist])
+#         for i in range(NUM_EDGES): # select class in the nodes for an edge
+#             edge_class_list = EDGE_CLASS_LIST[i]       
+#             EDGE_CLASS_LIST_REAL_FLAT = np.zeros(NUM_CLASS+1)
+            
+#             while (len(EDGE_CLASS_LIST_REAL_FLAT) != len(EDGE_CLASS_LIST[i])): # check whether all nodes in a edge sample all class assigned to the edge
+#                 EDGE_NODE_CLASS_LIST[i] = []
+#                 for j in range(NUM_NODES_PER_EDGE):
+#                     num_class_in_node = sample_truncated_normal(mean=NUM_CLASS_NODE, sd=1, low=1, upp=len(edge_class_list),size=1)
+#                     class_in_node = np.random.choice(edge_class_list, num_class_in_node, replace=False).tolist()
+#                     EDGE_NODE_CLASS_LIST[i].append(class_in_node)
+#                 EDGE_CLASS_LIST_REAL_FLAT = np.unique([item for sublist in EDGE_NODE_CLASS_LIST[i] for item in sublist])
+
+
+        for i in range(NUM_EDGES): # select class in the nodes for an edge
+            EDGE_NODE_CLASS_LIST[i] = []
+            edge_class_list = EDGE_CLASS_LIST[i]  
+            
+            
+            NUM_CLASS_NODE_SAMPLED_MEAN = -100
+            while(np.abs(NUM_CLASS_NODE_SAMPLED_MEAN - NUM_CLASS_NODE)>0.1): # mean error should be lower than 0.1 for sampling the number of class in each node for an edge
+                NUM_CLASS_NODE_SAMPLED = sample_truncated_normal(mean=NUM_CLASS_NODE, sd=1, low=1, upp=len(edge_class_list), size=NUM_NODES_PER_EDGE)
+                NUM_CLASS_NODE_SAMPLED_MEAN = np.mean(NUM_CLASS_NODE_SAMPLED)
+                if len(edge_class_list) < NUM_CLASS_NODE:
+                    break
+            
+            class_left = set(edge_class_list)
+            num_allocated_nodes = 0
+            while(len(class_left) != 0): # check whether all class are sampled at least once in the nodes for an edge
+                if NUM_CLASS_NODE_SAMPLED[num_allocated_nodes] > len(class_left):
+                    class_list = list(class_left)
+                    class_left_complement_list = list(set(edge_class_list).difference(class_left))
+                    p = choice_prob[class_left_complement_list]/np.sum(choice_prob[class_left_complement_list])
+                    class_list_rest = np.random.choice(class_left_complement_list, NUM_CLASS_NODE_SAMPLED[num_allocated_nodes]-len(class_list), replace=False, p=p).tolist()
+                    class_list += class_list_rest
+                else:
+                    p = choice_prob[list(class_left)]/np.sum(choice_prob[list(class_left)])
+                    class_list = np.random.choice(list(class_left), NUM_CLASS_NODE_SAMPLED[num_allocated_nodes], replace=False, p=p).tolist()
+                EDGE_NODE_CLASS_LIST[i].append(class_list)
+                class_left.difference_update(set(class_list))
+                num_allocated_nodes += 1
+
+            for j in range(NUM_NODES_PER_EDGE-num_allocated_nodes): # allocate class to rest of nodes in an edge
+                j += num_allocated_nodes
+                p = choice_prob[edge_class_list]/np.sum(choice_prob[edge_class_list])
+                class_list = np.random.choice(edge_class_list, NUM_CLASS_NODE_SAMPLED[j], replace=False, p=p).tolist()
+                EDGE_NODE_CLASS_LIST[i].append(class_list)
             
         EDGE_NODE_CLASS_LIST_FLAT = [iitem for sublist in EDGE_NODE_CLASS_LIST for item in sublist for iitem in item]
         NODE_CLASS_LIST_UNIQUE = np.unique(EDGE_NODE_CLASS_LIST_FLAT)
@@ -258,6 +325,8 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
         min_error_new = np.abs(NODE_CLASS_NUM_SAMPLED_MEAN-NUM_CLASS_NODE)
         if min_error_new < min_error:
             EDGE_NODE_CLASS_LIST_SAVED = EDGE_NODE_CLASS_LIST
+    
+#     print(EDGE_NODE_CLASS_LIST)
     
     EDGE_NODE_CLASS_LIST = EDGE_NODE_CLASS_LIST_SAVED
     EDGE_NODE_CLASS_LIST_FLAT = [iitem for sublist in EDGE_NODE_CLASS_LIST for item in sublist for iitem in item]
@@ -275,7 +344,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
     NUM_DATA_PER_SAMPLED_CLASS = []
     for i in range(NUM_CLASS):
         NUM_DATA_PER_SAMPLED_CLASS.append(DATA_BY_CLASS[i]['x'].shape[0]/Class_Counter[i])
-
+    
     trainData_byNid = []
     train_z = []
     
@@ -286,6 +355,8 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
             for i in node_class_list: # i-th node
                 if initial_counter == 0: # make initial x,y dictionary for each node
                     num_sampled = sample_truncated_normal(mean=NUM_DATA_PER_SAMPLED_CLASS[i], sd = 1, low=1, upp=2*NUM_DATA_PER_SAMPLED_CLASS[i], size=1)[0] # number of datapoint for a class in a node
+                    if num_sampled > 2:
+                        num_sampled -= 1
                     if NUM_DATA_PER_CLASS[i] > num_sampled:
                         indice_sampled = np.random.choice(range(NUM_DATA_PER_CLASS[i]), size=num_sampled, replace=False).tolist()
                         trainData_byNid.append({'x':DATA_BY_CLASS[i]['x'][indice_sampled] , 'y':DATA_BY_CLASS[i]['y'][indice_sampled]})
