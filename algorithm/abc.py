@@ -201,7 +201,6 @@ class AbstractAlgorithm(ABC):
                 prevTime = j * PRINT_INTERVAL
                 if prevTime in refDict: break
             [loss, accuracy, epoch, aggrType] = refDict[prevTime]
-            print(curTime, prevTime, epoch)
             fwTime.writerow([curTime, loss, accuracy, epoch, aggrType])
         fileTime.close()
         fileEpoch.close()

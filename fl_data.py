@@ -1,11 +1,7 @@
 import numpy as np
-import random
 
 from scipy.stats import truncnorm
 from collections import Counter
-
-def flattenX(data_by1Nid):
-    data_by1Nid[0]['x'] = np.array([ x_.flatten() for x_ in data_by1Nid[0]['x'] ], dtype=np.float32)
     
 def sample(data_by1Nid, numSamples):
     return [ { 'x': data_by1Nid[0]['x'][:numSamples], 'y': data_by1Nid[0]['y'][:numSamples] } ]
@@ -26,7 +22,6 @@ def groupByClass(data_by1Nid):
 
 def partitionSumRandomly(numSamples, numNodes):
     # 0을 방지하기 위해 Half Random, Half Uniform
-    np.random.seed(1234)
     mu, sigma = 0, 1 # 표준 정규분포로 Sample 개수 가중치 생성
     while True:
         weights = np.random.normal(mu, sigma, numNodes)
@@ -178,7 +173,6 @@ def groupByNode(data_by1Nid, nodeType, numNodes):
     return data_byNid
 
 def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
-    np.random.seed(1234)
     trainData_by1Nid = data_by1Nid
     NUM_CLASS = len(np.unique(trainData_by1Nid[0]['y']))
     

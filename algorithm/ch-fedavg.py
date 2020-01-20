@@ -111,7 +111,6 @@ class Algorithm(AbstractAlgorithm):
             
     def run_IID_Weighting(self, c, nid2_g_i__w, g__w, mode=1):
         print('IID Weighting Started')
-        random.seed(1234)
         
         c_star = c.clone()
         if mode == 1:

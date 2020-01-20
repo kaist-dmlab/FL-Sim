@@ -37,13 +37,13 @@ class AbstractModel(ABC):
         self.trainData_by1Nid = trainData_by1Nid
         self.testData_by1Nid = testData_by1Nid
         self.x_shape = trainData_by1Nid[0]['x'].shape
+        self.numClasses = len(np.unique(trainData_by1Nid[0]['y']))
         
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         
         self.graph = tf.Graph()
         with self.graph.as_default():
-#             tf.set_random_seed(123 + seed)
             x_ph_shape = [None] + [ self.x_shape[j] for j in range(1, len(self.x_shape)) ]
             self.x = tf.placeholder(name='x', shape=x_ph_shape, dtype=tf.float32)
             self.y = tf.placeholder(name='y', shape=[None], dtype=tf.int32)
@@ -52,7 +52,8 @@ class AbstractModel(ABC):
             self.w = tf.trainable_variables()
             self.g = tf.gradients(self.loss, self.w)
             self.train_op = self.getOptimizer()
-            self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y_hat, self.y), tf.float32))
+            self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.y, self.y_hat), tf.float32))
+#             self.accuracy = tf.reduce_mean(tf.count_nonzero(tf.equal(self.y, self.y_hat)))
         self.sess = tf.Session(config=config, graph=self.graph)
         
         self.size = graph_size(self.graph)

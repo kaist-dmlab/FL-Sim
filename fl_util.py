@@ -4,17 +4,19 @@ import numpy as np
 import pickle
 import json
 
+from leaf.models.utils.model_utils import read_dir
+
 def parseArgs():
     parser = argparse.ArgumentParser()
     parser.add_argument('--modelName',
                     help='modelName',
                     type=str,
-                    choices=['sr', '1nn', '2nn', 'cnn'], # svm, resnet 제외
+                    choices=['sr', '1nn', '2nn', 'cnn-mnist', 'cnn-cifar10', 'cnn-femnist', 'cnn-celeba'], # svm, resnet 제외
                     required=True)
     parser.add_argument('--dataName',
                     help='dataName',
                     type=str,
-                    choices=['mnist-o', 'mnist-f', 'femnist', 'celeba'], # cifar10 제외
+                    choices=['mnist-o', 'mnist-f', 'cifar10', 'femnist', 'celeba'],
                     required=True)
     parser.add_argument('--algName',
                     help='algName',
@@ -71,6 +73,10 @@ def parseArgs():
                     help='batchSize',
                     type=int,
                     default=128)
+    parser.add_argument('--seed',
+                    help='seed',
+                    type=int,
+                    default=0)
     parser.add_argument('--isValidation',
                     help='isValidation',
                     type=bool,
@@ -78,27 +84,44 @@ def parseArgs():
     args = parser.parse_args()
     
     if args.modelName == 'sr':
+        if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
         args.maxEpoch = 1500
-        # sr, cifar10 의 경우는 데이터에 비해 모델이 너무 단순해서 실험에서 제외
-        if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
     elif args.modelName == '1nn':
-        args.sgdEnabled = True
-        args.maxEpoch = 500
         if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
+        args.maxEpoch = 500
     elif args.modelName == '2nn':
-        args.sgdEnabled = True
-        args.maxEpoch = 500
         if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
-    elif args.modelName == 'cnn':
-        args.sgdEnabled = True
+        args.maxEpoch = 500
+    elif args.modelName == 'cnn-mnist':
+        if not(args.dataName == 'mnist-o'
+               or args.dataName == 'mnist-f'
+               or args.dataName == 'femnist'): raise Exception(args.modelName, args.dataName)
+        args.maxEpoch = 500
+    elif args.modelName == 'cnn-cifar10':
+        if args.dataName != 'cifar10': raise Exception(args.modelName, args.dataName)
+        args.maxEpoch = 500
+    elif args.modelName == 'cnn-femnist':
+        if args.dataName != 'femnist': raise Exception(args.modelName, args.dataName)
+        args.maxEpoch = 500
+    elif args.modelName == 'cnn-celeba':
+        if args.dataName != 'celeba': raise Exception(args.modelName, args.dataName)
         args.maxEpoch = 500
 #     elif args.modelName == 'resnet':
-#         args.sgdEnabled = True
 #         args.batchSize = 256
 #         if args.dataName != 'cifar10': # 'resnet' 은 cifar10 만 지원
 #             raise Exception(args.modelName, args.dataName)
     else:
         raise Exception(args.modelName)
+        
+    if args.dataName == 'cifar10':
+        args.sgdEnabled = True
+        args.lrInitial = 0.01
+    elif args.dataName == 'femnist':
+        args.sgdEnabled = True
+        args.lrInitial = 0.06 # LEAF Paper
+    elif args.dataName == 'celeba':
+        args.sgdEnabled = True
+        args.lrInitial = 0.001 # LEAF Paper
     return args
 
 def serialize(filePath, obj):
@@ -116,3 +139,6 @@ def dumpJson(filePath, jsonObj):
 def loadJson(filePath):
     with open(filePath, 'r') as handle:
         return json.load(handle)
+    
+def readJsonDir(dirPath):
+    return read_dir(dirPath)
