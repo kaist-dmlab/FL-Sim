@@ -1,4 +1,3 @@
-import tensorflow as tf
 import importlib
 
 import random
@@ -8,14 +7,11 @@ import fl_util
 
 def main():
     args = fl_util.parseArgs()
-    
-    # Suppress tf warnings
-    tf.logging.set_verbosity(tf.logging.WARN)
 
     # Set the random seed if provided (affects client sampling, and batching)
+    # tf.set_random_seed 는 model.abc 에서 Graph 생성 후 수행
     random.seed(1 + args.seed)
     np.random.seed(12 + args.seed)
-    tf.set_random_seed(123 + args.seed)
     
     algPackagePath = 'algorithm.' + args.algName
     algModule = importlib.import_module(algPackagePath)

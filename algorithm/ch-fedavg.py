@@ -18,7 +18,7 @@ class Algorithm(AbstractAlgorithm):
     def getFileName(self):
         d_budget = self.args.opaque1
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + str(self.args.nodeType) + str(self.args.edgeType) + '_' + str(d_budget)
+                + self.args.nodeType + self.args.edgeType + '_' + str(d_budget)
     
     def getApprCommCostGroup(self):
         return self.c.get_hpp_group(True) * 2
@@ -266,7 +266,8 @@ class Algorithm(AbstractAlgorithm):
         np.random.shuffle(idx_Nid2)
         idx_Nid2 = idx_Nid2[:GROUPING_NUM_SAMPLE_NODE]
 
-        numTotalClasses = len(np.unique(self.trainData_by1Nid[0]['y']))
+        numTotalClasses = len(np.unique(self.trainData_by1Nid[0]['y']))3
+        
         z = c.z
         for i in idx_Nid1:
             for j in idx_Nid2:

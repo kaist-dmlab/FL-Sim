@@ -39,11 +39,15 @@ class AbstractModel(ABC):
         self.x_shape = trainData_by1Nid[0]['x'].shape
         self.numClasses = len(np.unique(trainData_by1Nid[0]['y']))
         
+        # Suppress tf warnings
+        tf.logging.set_verbosity(tf.logging.WARN)
+        
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         
         self.graph = tf.Graph()
         with self.graph.as_default():
+            tf.set_random_seed(123 + args.seed)
             x_ph_shape = [None] + [ self.x_shape[j] for j in range(1, len(self.x_shape)) ]
             self.x = tf.placeholder(name='x', shape=x_ph_shape, dtype=tf.float32)
             self.y = tf.placeholder(name='y', shape=[None], dtype=tf.int32)

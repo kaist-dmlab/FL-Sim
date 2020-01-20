@@ -1,4 +1,3 @@
-import tensorflow as tf
 import importlib
 import numpy as np
 import os
@@ -8,8 +7,9 @@ from time import gmtime, strftime #strftime("%m%d_%H%M%S", gmtime()) + ' ' +
 
 from abc import ABC, abstractmethod
 
+from cloud.cloud import Cloud
+from cloud.fattree import FatTree
 import fl_data
-import fl_struct
 import fl_util
 
 LOG_DIR_NAME = 'log'
@@ -38,7 +38,7 @@ class AbstractAlgorithm(ABC):
             self.testData_by1Nid = fl_util.deserialize(os.path.join('data', self.args.dataName, 'val'))
         else:
             self.testData_by1Nid = fl_util.deserialize(os.path.join('data', self.args.dataName, 'test'))
-        
+            
         modelPackagePath = 'model.' + self.args.modelName
         modelModule = importlib.import_module(modelPackagePath)
         Model = getattr(modelModule, 'Model')
@@ -57,12 +57,12 @@ class AbstractAlgorithm(ABC):
         self.fileEpoch = open(os.path.join(LOG_DIR_NAME, fileName + '_' + EPOCH_CSV_POSTFIX), 'w', newline='', buffering=1)
         self.fwEpoch = csv.writer(self.fileEpoch, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         
-        ft = fl_struct.FatTree(self.model.size, self.args.numNodes, self.args.numEdges)
-        self.c = fl_struct.Cloud(ft, trainData_byNid, self.args.numGroups)
+        ft = FatTree(self.model.size, self.args.numNodes, self.args.numEdges)
+        self.c = Cloud(ft, trainData_byNid, self.args.numGroups)
         if randomEnabled == False:
             self.c.digest(z_edge)
         else:
-            z_rand = groupRandomly(self.args.numNodes, self.args.numGroups)    
+            z_rand = groupRandomly(self.args.numNodes, self.args.numGroups)
             self.c.digest(z_rand)
         
         self.groupTimeMap = {}
@@ -116,7 +116,7 @@ class AbstractAlgorithm(ABC):
         return 0
         
     def getCommTimeGroupExt(self, b_group):
-        b_group = str(int(b_group/10)) + 'MBps' # 10: fl_struct 참조
+        b_group = str(int(b_group/10)) + 'MBps' # 10: cloud.fattree 참조
         return self.getCommTimeGroup(b_group)
         
     def getCommTimeGroup(self, b_group):

@@ -39,7 +39,7 @@ def groupByNode_old(data_by1Nid, nodeType, numNodes):
     if not(numNodes % numClasses == 0): raise Exception(str(numNodes) + ' ' + str(numClasses))
     data_byClass = groupByClass(data_by1Nid)
     data_byNid = []
-    if nodeType == 'o':
+    if nodeType == 't':
         numNodesPerClass = int(numNodes / numClasses)
         for c in range(numClasses):
             curNumSamples = len(data_byClass[c]['y'])
@@ -117,18 +117,18 @@ def groupByEdge_old(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
     if not(numNodesPerEdge % numClasses == 0): raise Exception(str(numNodesPerEdge) + ' ' + str(numClasses))
     numNodesPerClass = int(numNodes / numClasses)
     nids_byEid = []
-    if (nodeType == 'o' and edgeType == 'o') \
+    if (nodeType == 't' and edgeType == 't') \
         or (nodeType == 'f' and edgeType == 'f') \
         or (nodeType == 'h' and edgeType == 'h') \
         or (nodeType == 'a' and edgeType == 'a'):
         nids_byEid = [ [ k * numNodesPerEdge + i_ for i_ in range(numNodesPerEdge) ] for k in range(numEdges) ]
-    elif nodeType == 'o' and edgeType == 'f':
+    elif nodeType == 't' and edgeType == 'f':
         numClassSet = 5
         for k in range(numClassSet):
             for j in range(numNodesPerClass):
                 nids_byEid.append([ k * int(numNodes / numClassSet) + j + i * numNodesPerClass for i in range(int(numClasses / numClassSet)) ])
         nids_byEid = np.array(nids_byEid).reshape((numEdges, numNodesPerEdge)).tolist()
-    elif nodeType == 'o' and edgeType == 'h':
+    elif nodeType == 't' and edgeType == 'h':
         numClassSet = 2
         for k in range(numClassSet):
             for j in range(numNodesPerClass):
@@ -140,7 +140,7 @@ def groupByEdge_old(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
             for j in range(numNodesPerClass):
                 nids_byEid.append([ k * int(numNodes / numClassSet) + j + i * numNodesPerClass for i in range(int(numClasses / numClassSet)) ])
         nids_byEid = np.array(nids_byEid).reshape((numEdges, numNodesPerEdge)).tolist()
-    elif (nodeType == 'o' and edgeType == 'a') \
+    elif (nodeType == 't' and edgeType == 'a') \
         or (nodeType == 'f' and edgeType == 'a') \
         or (nodeType == 'h' and edgeType == 'a'):
         nids_byEid = [ [ j + i * numEdges for i in range(numNodesPerEdge) ] for j in range(numEdges) ]
@@ -177,7 +177,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
     NUM_CLASS = len(np.unique(trainData_by1Nid[0]['y']))
     
     # average # of class in each node
-    if nodeType == 'o':
+    if nodeType == 't':
         NUM_CLASS_NODE = max(NUM_CLASS/10, 1)
     elif nodeType == 'q':
         NUM_CLASS_NODE = max(NUM_CLASS/4, 1)
@@ -189,7 +189,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
         raise Exception(nodeType)
     
     # average # of class in each edge
-    if edgeType == 'o':
+    if edgeType == 't':
         NUM_CLASS_EDGE = max(NUM_CLASS/10, 1)
     elif edgeType == 'q':
         NUM_CLASS_EDGE = max(NUM_CLASS/4, 1)

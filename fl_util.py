@@ -26,12 +26,12 @@ def parseArgs():
     parser.add_argument('--nodeType',
                     help='nodeType',
                     type=str,
-                    choices=['o', 'q', 'h', 'a'],
+                    choices=['t', 'q', 'h', 'a'],
                     required=True)
     parser.add_argument('--edgeType',
                     help='edgeType',
                     type=str,
-                    choices=['o', 'q', 'h', 'a'],
+                    choices=['t', 'q', 'h', 'a'],
                     default='a')
     parser.add_argument('--opaque1',
                     help='opaque1',
