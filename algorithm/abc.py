@@ -67,13 +67,16 @@ class AbstractAlgorithm(ABC):
             z_rand = groupRandomly(self.args.numNodes, self.args.numGroups)
             self.c.digest(z_rand)
         
+        print('Profiling delays')
         self.groupTimeMap = {}
         self.globalTimeMap = {}
         for b_group in [ 10 ]:
             d_group = self.getCommTimeGroupExt(b_group)
+            print('b_group', b_group, 'd_group', d_group)
             self.groupTimeMap[b_group] = d_group
         for b_global in [ 10 ]:
             d_global = self.getCommTimeGlobalExt(b_global)
+            print('b_global', b_global, 'd_global', d_global)
             self.globalTimeMap[b_global] = d_global
     
     @abstractmethod

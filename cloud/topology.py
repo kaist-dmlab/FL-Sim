@@ -32,14 +32,21 @@ class AbstractTopology(ABC):
     
     def combineCommPairs(self, commPairs):
         # 현재 통신 Src 중 같은 Edge 에 속하며 같은 Dst 을 가지는 것에 대해 하나만 Src 로 Combine
+        inEdgeCommPairs = []
         combinedCommPairs = {}
         for commPair in commPairs:
             srcNid = commPair[0]
             dstNid = commPair[1]
             srcEid = self.nid2eid[srcNid]
-            if not((srcEid, dstNid) in combinedCommPairs):
-                combinedCommPairs[(srcEid, dstNid)] = [srcNid, dstNid]
-        commPairs = list(combinedCommPairs.values())
+            dstEid = self.nid2eid[dstNid]
+            if srcEid == dstEid:
+                # Edge 내부 통신일 경우 combine 미적용
+                inEdgeCommPairs.append((srcNid, dstNid))
+            else:
+                # Edge 간 통신일 경우 combine 적용
+                if not((srcEid, dstNid) in combinedCommPairs):
+                    combinedCommPairs[(srcEid, dstNid)] = (srcNid, dstNid)
+        commPairs = inEdgeCommPairs + list(combinedCommPairs.values())
         return commPairs
     
     def getSumOfHopsPerPacket(self, commPairs, edgeCombineEnabled):
