@@ -81,6 +81,11 @@ def parseArgs():
                     help='isValidation',
                     type=bool,
                     default=False)
+    parser.add_argument('--topologyName',
+                    help='topologyName',
+                    type=str,
+                    choices=['fattree', 'jellyfish'],
+                    default='fattree')
     args = parser.parse_args()
     
     if args.modelName == 'sr':

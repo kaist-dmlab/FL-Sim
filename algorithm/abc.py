@@ -8,7 +8,6 @@ from time import gmtime, strftime #strftime("%m%d_%H%M%S", gmtime()) + ' ' +
 from abc import ABC, abstractmethod
 
 from cloud.cloud import Cloud
-from cloud.fattree import FatTree
 import fl_data
 import fl_util
 
@@ -57,8 +56,11 @@ class AbstractAlgorithm(ABC):
         self.fileEpoch = open(os.path.join(LOG_DIR_NAME, fileName + '_' + EPOCH_CSV_POSTFIX), 'w', newline='', buffering=1)
         self.fwEpoch = csv.writer(self.fileEpoch, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         
-        ft = FatTree(self.model.size, self.args.numNodes, self.args.numEdges)
-        self.c = Cloud(ft, trainData_byNid, self.args.numGroups)
+        topologyPackagePath = 'cloud.' + self.args.topologyName
+        topologyModule = importlib.import_module(topologyPackagePath)
+        Topology = getattr(topologyModule, 'Topology')
+        topology = Topology(self.model.size, self.args.numNodes, self.args.numEdges)
+        self.c = Cloud(topology, trainData_byNid, self.args.numGroups)
         if randomEnabled == False:
             self.c.digest(z_edge)
         else:

@@ -6,11 +6,11 @@ import fl_data
 # 시뮬레이션은 SIM_DATA_SIZE 크기가 클 수록 패킷 수가 늘어나서 오래걸림
 # 자세한 결과는 test-struct.ipynb 참조
 LINK_SPEED = '1MBps'
-    
+
 class Cloud:
     
-    def __init__(self, ft, D_byNid, numGroups):
-        self.ft = ft
+    def __init__(self, topology, D_byNid, numGroups):
+        self.topology = topology
         self.D_byNid = D_byNid
         numTotalClasses = len(np.unique(np.concatenate([D_byNid[nid]['y'] for nid in range(len(D_byNid))])))
         cid2_pc = np.zeros(numTotalClasses, dtype=np.int32)
@@ -26,7 +26,7 @@ class Cloud:
             nid2_cid2_pc_is[nid] = cid2_numClasses_i / sum(cid2_numClasses_i)
         cid2_pc = cid2_pc / sum(cid2_pc)
         
-        self.groups = [ Group(k, ft, D_byNid, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is) for k in range(numGroups) ]
+        self.groups = [ Group(k, topology, D_byNid, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is) for k in range(numGroups) ]
         self.ps_nid = 0 # 모든 노드와의 거리가 같으므로 처음 노드로 설정
         self.ready = False
     
@@ -40,7 +40,7 @@ class Cloud:
         return True
     
     def clone(self):
-        c_cloned = Cloud(self.ft, self.D_byNid, len(self.groups))
+        c_cloned = Cloud(self.topology, self.D_byNid, len(self.groups))
         c_cloned.set_p_is(self.get_p_is())
         c_cloned.digest(self.z)
         return c_cloned
@@ -72,22 +72,22 @@ class Cloud:
     
     def get_d_global(self, edgeCombineEnabled, linkSpeed=LINK_SPEED):
         if self.ready == False: raise Exception
-        return self.ft.simulate('d_global', [ [nid, self.ps_nid] for nid in self.N ], edgeCombineEnabled, linkSpeed)
+        return self.topology.getDelay([ [nid, self.ps_nid] for nid in self.N ], edgeCombineEnabled, linkSpeed)
     
     def get_d_group(self, edgeCombineEnabled, linkSpeed=LINK_SPEED):
         if self.ready == False: raise Exception
         commPairs = []
         for g in self.groups:
             commPairs += [ [nid, g.ps_nid] for nid in g.get_N_k() ]
-        return self.ft.simulate('d_group', commPairs, edgeCombineEnabled, linkSpeed)
+        return self.topology.getDelay(commPairs, edgeCombineEnabled, linkSpeed)
     
     def get_hpp_global(self, edgeCombineEnabled):
         if self.ready == False: raise Exception
-        return self.ft.getSumOfHopsPerPacket([ [nid, self.ps_nid] for nid in self.N ], edgeCombineEnabled)
+        return self.topology.getSumOfHopsPerPacket([ [nid, self.ps_nid] for nid in self.N ], edgeCombineEnabled)
     
     def get_hpp_group(self, edgeCombineEnabled):
         if self.ready == False: raise Exception
-        return max([ self.ft.getSumOfHopsPerPacket([ [nid, g.ps_nid] for nid in g.get_N_k() ], edgeCombineEnabled) for g in self.groups ])
+        return max([ self.topology.getSumOfHopsPerPacket([ [nid, g.ps_nid] for nid in g.get_N_k() ], edgeCombineEnabled) for g in self.groups ])
     
     def get_delta(self, nid2_g_i__w):
         if self.ready == False: raise Exception
@@ -148,9 +148,9 @@ class Cloud:
 
 class Group:
     
-    def __init__(self, k, ft, D_byNid, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is):
+    def __init__(self, k, topology, D_byNid, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is):
         self.k = k
-        self.ft = ft
+        self.topology = topology
         self.D_byNid = D_byNid
         self.p_is = None
         self.cid2_pc = cid2_pc
@@ -257,5 +257,5 @@ class Group:
             self.nid2_p_k_i[nid] = p_k_i
             self.nid2_D_k_i[nid] = D_k_i
         if not(debugging):
-            self.ps_nid = self.N_k[ np.argmin([ sum( self.ft.getDistance(nid1, nid2) for nid2 in self.N_k ) for nid1 in self.N_k ]) ]
+            self.ps_nid = self.N_k[ np.argmin([ sum( self.topology.getDistance(nid1, nid2) for nid2 in self.N_k ) for nid1 in self.N_k ]) ]
         self.ready = True
