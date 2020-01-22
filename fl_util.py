@@ -96,7 +96,7 @@ def parseArgs():
     parser.add_argument('--isValidation',
                     help='isValidation',
                     type=bool,
-                    default=False)
+                    default=True)
     parser.add_argument('--topologyName',
                     help='topologyName',
                     type=str,
