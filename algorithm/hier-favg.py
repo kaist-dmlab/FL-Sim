@@ -26,10 +26,9 @@ class Algorithm(AbstractAlgorithm):
         lr = self.args.lrInitial
         input_w_ks = [ self.model.getParams() for _ in self.c.groups ]
         
-    #     for t3 in range(int(self.args.maxEpoch/(tau1*tau2))):
         tau1 = int(self.args.opaque1)
         tau2 = int(self.args.opaque2)
-        t3 = 0
+        t3 = 0 ; time = 0
         while True:
             for t2 in range(tau2):
                 w_k_byTime_byGid = []
@@ -42,21 +41,24 @@ class Algorithm(AbstractAlgorithm):
                 input_w_ks = output_w_ks
                 w_byTime = self.model.federated_aggregate(w_k_byTime_byGid, self.c.get_p_ks()) # Global Aggregation
                 for t1 in range(tau1):
-                    self.t = t3*tau1*tau2 + t2*tau1 + t1 + 1
-                    if self.t % tau1 == 0 and not(self.t % (tau1*tau2)) == 0:
+                    self.epoch = t3*tau1*tau2 + t2*tau1 + t1 + 1
+                    if self.epoch % tau1 == 0 and not(self.epoch % (tau1*tau2)) == 0:
+                        time += self.d_group
                         aggrType = 'Group'
-                    elif self.t % (tau1*tau2) == 0:
+                    elif self.epoch % (tau1*tau2) == 0:
+                        time += self.d_global
                         aggrType = 'Global'
                     else:
+                        time += self.d_local
                         aggrType = ''
                     (loss, _, _, acc) = self.model.evaluate(w_byTime[t1])
-                    print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f\taggrType=%s' % (self.t, loss, acc, aggrType))
-                    self.fwEpoch.writerow([self.t, loss, acc, aggrType])
+                    print('epoch=%5d\ttime=%.3f\tloss=%.3f\taccuracy=%.3f\taggrType=%s' % (self.epoch, time, loss, acc, aggrType))
+                    self.fwEpoch.writerow([self.epoch, loss, acc, aggrType])
                     
                     lr *= self.args.lrDecayRate
-                    if self.t >= self.args.maxEpoch: break;
-                if self.t >= self.args.maxEpoch: break;
-            if self.t >= self.args.maxEpoch: break;
+                    if time >= self.args.maxTime: break;
+                if time >= self.args.maxTime: break;
+            if time >= self.args.maxTime: break;
             t3 += 1
             
             w = w_byTime[-1]

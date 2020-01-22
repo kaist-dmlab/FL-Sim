@@ -18,24 +18,25 @@ class Algorithm(AbstractAlgorithm):
         
         lr = self.args.lrInitial
         w = self.model.getParams()
-        
-    #     for t2 in range(int(self.args.maxEpoch/tau1)):
+
         tau1 = int(self.args.opaque1)
-        t2 = 0
+        t2 = 0 ; time = 0
         while True:
             (w_byTime, _) = self.model.federated_train(w, self.c.get_D_is(), lr, tau1, self.c.get_p_is())
             w = w_byTime[-1]
             for t1 in range(tau1):
-                self.t = t2*tau1 + t1 + 1
-                if self.t % tau1 == 0:
+                self.epoch = t2*tau1 + t1 + 1
+                if self.epoch % tau1 == 0:
+                    time += self.d_global
                     aggrType = 'Global'
                 else:
+                    time += self.d_local
                     aggrType = ''
                 (loss, _, _, acc) = self.model.evaluate(w_byTime[t1])
-                print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f\taggrType=%s' % (self.t, loss, acc, aggrType))
-                self.fwEpoch.writerow([self.t, loss, acc, aggrType])
+                print('epoch=%5d\ttime=%.3f\tloss=%.3f\taccuracy=%.3f\taggrType=%s' % (self.epoch, time, loss, acc, aggrType))
+                self.fwEpoch.writerow([self.epoch, loss, acc, aggrType])
                 
                 lr *= self.args.lrDecayRate
-                if self.t >= self.args.maxEpoch: break;
-            if self.t >= self.args.maxEpoch: break;
+                if time >= self.args.maxTime: break;
+            if time >= self.args.maxTime: break;
             t2 += 1

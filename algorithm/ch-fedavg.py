@@ -52,8 +52,8 @@ class Algorithm(AbstractAlgorithm):
         d_budget = self.args.opaque1
         numGroups = len(self.c.groups)
         
-    #     for t3 in range(int(self.args.maxEpoch/(tau1*tau2))):
-        self.t = 0 ; t_prev = 0 ; tau1 = 1 ; tau2 = 1 ; t3 = 0
+        self.epoch = 0 ; epoch_prev = 0
+        tau1 = 1 ; tau2 = 1 ; t3 = 0 ; time = 0
         while True:
             for t2 in range(tau2):
                 w_is = []
@@ -68,22 +68,25 @@ class Algorithm(AbstractAlgorithm):
                 input_w_ks = output_w_ks
                 w_byTime = self.model.federated_aggregate(w_k_byTime_byGid, self.c.get_p_ks()) # Global Aggregation
                 for t1 in range(tau1):
-                    self.t += 1
-                    if (t-t_prev) % tau1 == 0 and not((t-t_prev) % (tau1*tau2)) == 0:
+                    self.epoch += 1
+                    if (self.epoch-epoch_prev) % tau1 == 0 and not((self.epoch-epoch_prev) % (tau1*tau2)) == 0:
+                        time += self.d_group
                         aggrType = 'Group'
-                    elif (t-t_prev) % (tau1*tau2) == 0:
+                    elif (self.epoch-epoch_prev) % (tau1*tau2) == 0:
+                        time += self.d_global
                         aggrType = 'Global'
                     else:
+                        time += self.d_local
                         aggrType = ''
                     (loss, _, _, acc) = self.model.evaluate(w_byTime[t1])
-                    print('Epoch\t%d\tloss=%.3f\taccuracy=%.3f\taggrType=%s\tnumGroups=%d\ttau1=%d\ttau2=%d'
-                          % (self.t, loss, acc, aggrType, numGroups, tau1, tau2))
-                    self.fwEpoch.writerow([self.t, loss, acc, aggrType, numGroups, tau1, tau2])
+                    print('epoch=%5d\ttime=%.3f\tloss=%.3f\taccuracy=%.3f\taggrType=%s\tnumGroups=%d\ttau1=%d\ttau2=%d'
+                          % (self.epoch, time, loss, acc, aggrType, numGroups, tau1, tau2))
+                    self.fwEpoch.writerow([self.epoch, loss, acc, aggrType, numGroups, tau1, tau2])
                     
                     lr *= self.args.lrDecayRate
-                    if self.t >= self.args.maxEpoch: break;
-                if self.t >= self.args.maxEpoch: break;
-            if self.t >= self.args.maxEpoch: break;
+                    if time >= self.args.maxTime: break;
+                if time >= self.args.maxTime: break;
+            if time >= self.args.maxTime: break;
                 
             w = w_byTime[-1] # 출력을 위해 매 시간마다 수행했던 Global Aggregation 의 마지막 시간 값만 추출
             input_w_ks = [ w for _ in self.c.groups ]
@@ -106,7 +109,7 @@ class Algorithm(AbstractAlgorithm):
                 # IID Grouping
 #                 c = self.run_IID_Weighting(self.cc, nid2_g_i__w, g__w)
                 (self.c, tau1, tau2) = self.run_IID_Grouping(self.c, nid2_g_i__w, g__w, d_budget)
-            t_prev = self.t # Mark Time
+            epoch_prev = self.epoch # Mark Time
             t3 += 1
             
     def run_IID_Weighting(self, c, nid2_g_i__w, g__w, mode=1):

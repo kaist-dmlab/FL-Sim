@@ -16,7 +16,7 @@ def parseArgs():
     parser.add_argument('--dataName',
                     help='dataName',
                     type=str,
-                    choices=['mnist-o', 'mnist-f', 'cifar10', 'femnist', 'celeba'],
+                    choices=['mnist-o', 'mnist-f', 'femnist', 'celeba'], # cifar10 제외
                     required=True)
     parser.add_argument('--algName',
                     help='algName',
@@ -61,6 +61,22 @@ def parseArgs():
                     help='maxEpoch',
                     type=int,
                     default=1000)
+    parser.add_argument('--maxTime',
+                    help='maxTime',
+                    type=int,
+                    default=1000)
+    # https://deviceatlas.com/blog/most-used-smartphone-gpu
+    # https://en.wikipedia.org/wiki/PowerVR
+    parser.add_argument('--procSpeeds',
+                    help='procSpeeds',
+                    type=int,
+                    nargs='+',
+                    default=[250]) # GFLOPS unit
+    parser.add_argument('--linkSpeeds',
+                    help='linkSpeeds',
+                    type=int,
+                    nargs='+',
+                    default=[10]) # MBps unit
     parser.add_argument('--lrInitial',
                     help='lrInitial',
                     type=float,
@@ -90,31 +106,27 @@ def parseArgs():
     
     if args.modelName == 'sr':
         if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
-        args.maxEpoch = 1500
+        args.maxTime = 100
     elif args.modelName == '1nn':
         if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
-        args.maxEpoch = 500
+        args.maxTime = 1000
     elif args.modelName == '2nn':
         if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
-        args.maxEpoch = 500
+        args.maxTime = 1000
     elif args.modelName == 'cnn-mnist':
         if not(args.dataName == 'mnist-o'
                or args.dataName == 'mnist-f'
                or args.dataName == 'femnist'): raise Exception(args.modelName, args.dataName)
-        args.maxEpoch = 500
+        args.maxTime = 2000
     elif args.modelName == 'cnn-cifar10':
         if args.dataName != 'cifar10': raise Exception(args.modelName, args.dataName)
-        args.maxEpoch = 500
+        args.maxTime = 2000
     elif args.modelName == 'cnn-femnist':
         if args.dataName != 'femnist': raise Exception(args.modelName, args.dataName)
-        args.maxEpoch = 500
+        args.maxTime = 2000
     elif args.modelName == 'cnn-celeba':
         if args.dataName != 'celeba': raise Exception(args.modelName, args.dataName)
-        args.maxEpoch = 500
-#     elif args.modelName == 'resnet':
-#         args.batchSize = 256
-#         if args.dataName != 'cifar10': # 'resnet' 은 cifar10 만 지원
-#             raise Exception(args.modelName, args.dataName)
+        args.maxTime = 2000
     else:
         raise Exception(args.modelName)
         

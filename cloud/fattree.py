@@ -56,7 +56,7 @@ class Topology(AbstractTopology):
                 if not(nid1 in self.dist):
                     self.dist[nid1] = {}
                 self.dist[nid1][nid2] = len(nx.shortest_path(self.g, nid1, nid2)) - 1
-        
+                
     def createSimNetwork(self, linkSpeed, linkDelay):
         cores = ns.network.NodeContainer()
         cores.Create(self.numCores)
