@@ -1,17 +1,21 @@
 import numpy as np
+import os
 import csv
 import random
-from time import gmtime, strftime #strftime("%m%d_%H%M%S", gmtime()) + ' ' + 
+from time import gmtime, strftime
 
 from algorithm.abc import AbstractAlgorithm
 import fl_data
 
-GROUPING_INTERVAL = 10000
-GROUPING_MAX_STEADY_STEPS = 3
-GROUPING_NUM_SAMPLE_NODE = 100
+LOG_DIR_NAME = 'log'
+COST_CSV_POSTFIX = 'cost.csv'
 
 WEIGHTING_MAX_STEADY_STEPS = 100
 WEIGHTING_WEIGHT_DIFF = 10
+
+GROUPING_INTERVAL = 10000
+GROUPING_MAX_STEADY_STEPS = 1
+GROUPING_NUM_SAMPLE_NODE = 100
 
 class Algorithm(AbstractAlgorithm):
     
@@ -36,21 +40,20 @@ class Algorithm(AbstractAlgorithm):
         super().__init__(args, randomEnabled=True)
         
         fileName = self.getFileName()
-        self.fileDelta = open('logs/' + fileName + '_Delta.csv', 'w', newline='', buffering=1)
-        self.fwDelta = csv.writer(self.fileDelta, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        self.fileCost = open(os.path.join(LOG_DIR_NAME, fileName + '_' + COST_CSV_POSTFIX), 'w', newline='', buffering=1)
+        self.fwCost = csv.writer(self.fileCost, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         
     def __del__(self):
-        self.fileDelta.close()
+        self.fileCost.close()
         super().__del__()
         
     def run(self):
-        self.fwDelta.writerow(['time', 'cntSteady', 'Delta_star', 'Delta_cur'])
+        self.fwCost.writerow(['time', 'cntSteady', 'cost_star', 'cost_cur'])
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'aggrType', 'numGroups', 'tau1', 'tau2'])
         
         lr = self.args.lrInitial
         input_w_ks = [ self.model.getParams() for _ in self.c.groups ]
         d_budget = self.args.opaque1
-        numGroups = len(self.c.groups)
         
         self.epoch = 0 ; epoch_prev = 0
         tau1 = 1 ; tau2 = 1 ; t3 = 0 ; time = 0
@@ -69,6 +72,7 @@ class Algorithm(AbstractAlgorithm):
                 w_byTime = self.model.federated_aggregate(w_k_byTime_byGid, self.c.get_p_ks()) # Global Aggregation
                 for t1 in range(tau1):
                     self.epoch += 1
+                    time += self.d_local
                     if (self.epoch-epoch_prev) % tau1 == 0 and not((self.epoch-epoch_prev) % (tau1*tau2)) == 0:
                         time += self.d_group
                         aggrType = 'Group'
@@ -76,12 +80,11 @@ class Algorithm(AbstractAlgorithm):
                         time += self.d_global
                         aggrType = 'Global'
                     else:
-                        time += self.d_local
                         aggrType = ''
                     (loss, _, _, acc) = self.model.evaluate(w_byTime[t1])
                     print('epoch=%5d\ttime=%.3f\tloss=%.3f\taccuracy=%.3f\taggrType=%s\tnumGroups=%d\ttau1=%d\ttau2=%d'
-                          % (self.epoch, time, loss, acc, aggrType, numGroups, tau1, tau2))
-                    self.fwEpoch.writerow([self.epoch, loss, acc, aggrType, numGroups, tau1, tau2])
+                          % (self.epoch, time, loss, acc, aggrType, len(self.c.groups), tau1, tau2))
+                    self.fwEpoch.writerow([self.epoch, loss, acc, aggrType, len(self.c.groups), tau1, tau2])
                     
                     lr *= self.args.lrDecayRate
                     if time >= self.args.maxTime: break;
@@ -105,10 +108,9 @@ class Algorithm(AbstractAlgorithm):
 #                 p_is = [ 1 for _ in range(len(self.c.get_N())) ]
 #                 self.c.set_p_is(p_is)
 #                 self.c.digest(self.c.z)
-        
-                # IID Grouping
-#                 c = self.run_IID_Weighting(self.cc, nid2_g_i__w, g__w)
-                (self.c, tau1, tau2) = self.run_IID_Grouping(self.c, nid2_g_i__w, g__w, d_budget)
+
+#                 c = self.run_IID_Weighting(self.c, nid2_g_i__w, g__w)
+                (self.c, tau1, tau2) = self.run_Grouping(self.c, nid2_g_i__w, g__w, d_budget)
             epoch_prev = self.epoch # Mark Time
             t3 += 1
             
@@ -185,7 +187,7 @@ class Algorithm(AbstractAlgorithm):
             cntPrint += 1
             if cntPrint % 100 == 0:
                 print('delta_star=%.4f, delta_cur=%.4f' % (delta_star, delta_up))
-                self.fwDelta.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, delta_star, delta_up])
+                self.fwCost.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, delta_star, delta_up])
         else:
             # 유리하지 않을 경우,
             # 낮은 Weight 로 변경 시도 (2배: 원래대로 돌리는 것 포함)
@@ -211,7 +213,7 @@ class Algorithm(AbstractAlgorithm):
                 cntPrint += 1
                 if cntPrint % 100 == 0:
                     print('delta_star=%.4f, delta_cur=%.4f' % (delta_star, delta_down))
-                    self.fwDelta.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, delta_star, delta_down])
+                    self.fwCost.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, delta_star, delta_down])
             else:
                 # 유리하지 않을 경우, 다시 원래대로 초기화
                 p_is[curIdx] += WEIGHTING_WEIGHT_DIFF
@@ -219,46 +221,54 @@ class Algorithm(AbstractAlgorithm):
                 c.digest(c.z)
                 cntSteady += 1
         return (c_star, delta_star, cntSteady, cntPrint)
-        
-    def run_IID_Grouping(self, c, nid2_g_i__w, g__w, d_budget):
+    
+    def run_Grouping(self, c, nid2_g_i__w, g__w, d_budget):
         print('IID Grouping Started')
         
-        # 최적 초기화
-        c_star = c.clone()
-        DELTA_star = c_star.get_DELTA(nid2_g_i__w, g__w)
-        print('Initial DELTA_star=%.4f' % (DELTA_star))
-        self.fwDelta.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), 0, DELTA_star, DELTA_star])
+        (c_star, cost_star) = self.run_GroupingInternal(c, nid2_g_i__w, g__w)
         
-        cntSteady = 0
-        while cntSteady < GROUPING_MAX_STEADY_STEPS:
-            DELTA_cur = self.iterate_IID_Grouping(c, nid2_g_i__w, g__w)
-            if DELTA_star > DELTA_cur:
-                (c_star, DELTA_star) = (c.clone(), DELTA_cur)
-                cntSteady = 0 # 한 번이라도 바뀌면 Steady 카운터 초기화
-            else:
-                cntSteady += 1
-            print('cntSteady=%d, DELTA_star=%.4f, DELTA_cur=%.4f' % (cntSteady, DELTA_star, DELTA_cur))
-            self.fwDelta.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, DELTA_star, DELTA_cur])
-            
-        d_global = c.get_d_global(True)
-        d_group = c.get_d_group(True)
-        tau1 = 5
-        tau2 = 2
-#         tau2 = int(d_budget)
-#         if d_group < d_global:
-#             tau2 = max( int((d_budget + d_group - d_global) / d_group), 1 )
-#         else:
-#             tau2 = 2
-        print('Final DELTA_star=%.4f, tau1=%d, tau2=%d' % (DELTA_star, tau1, tau2))
-    
-        DELTA_star = c_star.get_DELTA(nid2_g_i__w, g__w)
-        print('Final DELTA_star=%.4f, tau1=%d, tau2=%d' % (DELTA_star, tau1, tau2))
+        d_global = c_star.get_d_global(True)
+        d_group = c_star.get_d_group(True)
+        tau1 = 1
+        if d_group < d_global:
+            tau2 = max( int((d_budget + d_group - d_global) / d_group), 1 )
+        else:
+            tau2 = 2
+        print('Final cost_star=%.4f, tau1=%d, tau2=%d' % (cost_star, tau1, tau2))
         
         print('IID Grouping Finished')
         return c_star, tau1, tau2
     
-    def iterate_IID_Grouping(self, c, nid2_g_i__w, g__w):
-        DELTA_cur = c.get_DELTA(nid2_g_i__w, g__w)
+    def run_GroupingInternal(self, c, nid2_g_i__w, g__w):
+        # 최적 초기화
+        c_star = c.clone()
+        cost_star = self.getCost(c_star, nid2_g_i__w, g__w)
+        print('Initial cost_star=%.4f' % (cost_star))
+        self.fwCost.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), 0, cost_star, cost_star])
+        
+        cntSteady = 0
+        while cntSteady < GROUPING_MAX_STEADY_STEPS:
+            cost_cur = self.iterate_Grouping(c, nid2_g_i__w, g__w)
+            if cost_star > cost_cur:
+                (c_star, cost_star) = (c.clone(), cost_cur)
+                cntSteady = 0 # 한 번이라도 바뀌면 Steady 카운터 초기화
+            else:
+                cntSteady += 1
+            print('cntSteady=%d, cost_star=%.4f, cost_cur=%.4f' % (cntSteady, cost_star, cost_cur))
+            self.fwCost.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, cost_star, cost_cur])
+        return (c_star, cost_star)
+    
+    def getCost(self, c, nid2_g_i__w, g__w):
+        return c.get_DELTA(nid2_g_i__w, g__w)
+    
+    def checkIntegrity(self, c, z_candidate):
+        nids_byGid = fl_data.to_nids_byGid(z_candidate)
+        numClassesPerGroup = np.mean([ len(np.unique(np.concatenate([c.D_byNid[nid]['y'] for nid in nids]))) for nids in nids_byGid ])
+        # 그룹의 데이터 분포가 IID 인지 검사
+        return numClassesPerGroup == self.model.numClasses
+    
+    def iterate_Grouping(self, c, nid2_g_i__w, g__w):
+        cost_cur = self.getCost(c, nid2_g_i__w, g__w)
 
         # Iteration 마다 탐색 인덱스 셔플
         idx_Nid1 = np.arange(len(c.get_N()))
@@ -268,8 +278,6 @@ class Algorithm(AbstractAlgorithm):
         idx_Nid2 = np.arange(len(c.get_N()))
         np.random.shuffle(idx_Nid2)
         idx_Nid2 = idx_Nid2[:GROUPING_NUM_SAMPLE_NODE]
-
-        numTotalClasses = len(np.unique(self.trainData_by1Nid[0]['y']))3
         
         z = c.z
         for i in idx_Nid1:
@@ -282,10 +290,8 @@ class Algorithm(AbstractAlgorithm):
                 z[i] = z[j]
                 z[j] = temp_k
                 
-                nids_byGid = fl_data.to_nids_byGid(z)
-                numClassesPerGroup = np.mean([ len(np.unique(np.concatenate([c.D_byNid[nid]['y'] for nid in nids]))) for nids in nids_byGid ])
-                if numClassesPerGroup != numTotalClasses:
-                    # 데이터 분포가 IID 가 아니게 될 경우, 다시 원래대로 그룹 멤버쉽 초기화
+                if self.checkIntegrity(c, z) == False:
+                    # 무결성을 만족 못할 경우, 다시 원래대로 그룹 멤버쉽 초기화
                     temp_k = z[i]
                     z[i] = z[j]
                     z[j] = temp_k
@@ -294,19 +300,19 @@ class Algorithm(AbstractAlgorithm):
                 # 한 그룹에 노드가 전부 없어지는 것은 있을 수 없는 경우
                 if c.digest(z) == False: raise Exception(str(z))
                     
-                # 다음 후보에 대한 DELTA 계산
-                DELTA_next = c.get_DELTA(nid2_g_i__w, g__w)
+                # 다음 후보에 대한 Cost 계산
+                cost_next = self.getCost(c, nid2_g_i__w, g__w)
                 
-                if DELTA_cur > DELTA_next:
+                if cost_cur > cost_next:
                     # 유리할 경우 변경
-                    DELTA_cur = DELTA_next
+                    cost_cur = cost_next
                 else:
                     # 유리하지 않을 경우, 다시 원래대로 그룹 멤버쉽 초기화 (다음 Iteration 에서 Digest)
                     temp_k = z[i]
                     z[i] = z[j]
                     z[j] = temp_k
-    #         print(i, DELTA_cur)
+            print(i, cost_cur)
     
         # 마지막 멤버십 초기화가 발생했을 수도 있으므로, Cloud Digest 시도
         if c.digest(z) == False: raise Exception(str(z))
-        return DELTA_cur
+        return cost_cur

@@ -26,11 +26,11 @@ class Algorithm(AbstractAlgorithm):
             w = w_byTime[-1]
             for t1 in range(tau1):
                 self.epoch = t2*tau1 + t1 + 1
+                time += self.d_local
                 if self.epoch % tau1 == 0:
                     time += self.d_global
                     aggrType = 'Global'
                 else:
-                    time += self.d_local
                     aggrType = ''
                 (loss, _, _, acc) = self.model.evaluate(w_byTime[t1])
                 print('epoch=%5d\ttime=%.3f\tloss=%.3f\taccuracy=%.3f\taggrType=%s' % (self.epoch, time, loss, acc, aggrType))

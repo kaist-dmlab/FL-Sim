@@ -42,6 +42,7 @@ class Algorithm(AbstractAlgorithm):
                 w_byTime = self.model.federated_aggregate(w_k_byTime_byGid, self.c.get_p_ks()) # Global Aggregation
                 for t1 in range(tau1):
                     self.epoch = t3*tau1*tau2 + t2*tau1 + t1 + 1
+                    time += self.d_local
                     if self.epoch % tau1 == 0 and not(self.epoch % (tau1*tau2)) == 0:
                         time += self.d_group
                         aggrType = 'Group'
@@ -49,7 +50,6 @@ class Algorithm(AbstractAlgorithm):
                         time += self.d_global
                         aggrType = 'Global'
                     else:
-                        time += self.d_local
                         aggrType = ''
                     (loss, _, _, acc) = self.model.evaluate(w_byTime[t1])
                     print('epoch=%5d\ttime=%.3f\tloss=%.3f\taccuracy=%.3f\taggrType=%s' % (self.epoch, time, loss, acc, aggrType))
