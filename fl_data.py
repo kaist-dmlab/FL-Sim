@@ -20,7 +20,9 @@ def groupByClass(data_by1Nid):
         data_byClass.append({ 'x': data_by1Nid[0]['x'][idxExamplesForC], 'y': data_by1Nid[0]['y'][idxExamplesForC] })
     return data_byClass
 
-def partitionSumRandomly(numSamples, numNodes):
+def partitionSumRandomly(numSamples, numNodes):    
+    if numNodes == 1: return [ numSamples ]
+    
     # 0을 방지하기 위해 Half Random, Half Uniform
     mu, sigma = 0, 1 # 표준 정규분포로 Sample 개수 가중치 생성
     while True:

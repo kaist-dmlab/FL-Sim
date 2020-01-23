@@ -1,9 +1,9 @@
 import importlib
 import numpy as np
 import os
-import collections
 import csv
 from time import gmtime, strftime #strftime("%m%d_%H%M%S", gmtime()) + ' ' + 
+import collections
 
 from abc import ABC, abstractmethod
 
@@ -18,8 +18,8 @@ TIME_CSV_POSTFIX = 'time.csv'
 PRINT_INTERVAL = 0.5
     
 def groupRandomly(numNodes, numGroups):
-    numNodesPerGroup = int(numNodes / numGroups)
-    z_rand = [ k for k in range(numGroups) for _ in range(numNodesPerGroup) ]
+    numNodesPerGroup = fl_data.partitionSumRandomly(numNodes, numGroups)
+    z_rand = [ i for (i, numNodes) in enumerate(numNodesPerGroup) for _ in range(numNodes) ]
     np.random.shuffle(z_rand)
     return z_rand
 
@@ -102,7 +102,10 @@ class AbstractAlgorithm(ABC):
                     'numTrainSamples': len(self.trainData_by1Nid[0]['x']),
                     'numTestSamples': len(self.testData_by1Nid[0]['x']),
                     'totalComps': totalComps,
-                    'totalComms': totalComms
+                    'totalComms': totalComms,
+                    'self.d_local': self.d_local,
+                    'self.d_group': self.d_group,
+                    'self.d_global': self.d_global
                    }
         fileName = self.getFileName()
         fl_util.dumpJson(os.path.join(LOG_DIR_NAME, fileName + '.json'), metadata)

@@ -8,7 +8,7 @@ import random
 
 from cloud.topology import AbstractTopology
 
-DEGREE = 3
+DEGREE = 1
 
 class Topology(AbstractTopology):
     
@@ -21,7 +21,6 @@ class Topology(AbstractTopology):
         # k = number of total switch ports
         # r = network degree
         # k-r = number of nodes per switch(numNodesPerEdge)
-        DEGREE = 2
         self.numNodesPerEdge = int(numNodes / numEdges)
         
         self.eidPairSet = set()

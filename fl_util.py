@@ -21,7 +21,7 @@ def parseArgs():
     parser.add_argument('--algName',
                     help='algName',
                     type=str,
-                    choices=['cgd', 'fedavg', 'hier-favg', 'ch-fedavg'],
+                    choices=['cgd', 'fedavg', 'hier-favg', 'ch-fedavg', 'ch-fedavg-d'],
                     required=True)
     parser.add_argument('--nodeType',
                     help='nodeType',
@@ -52,7 +52,7 @@ def parseArgs():
     parser.add_argument('--numGroups',
                     help='numGroups',
                     type=int,
-                    default=10)
+                    default=20)
     parser.add_argument('--sgdEnabled',
                     help='sgdEnabled',
                     type=bool,
@@ -96,12 +96,12 @@ def parseArgs():
     parser.add_argument('--isValidation',
                     help='isValidation',
                     type=bool,
-                    default=True)
+                    default=False)
     parser.add_argument('--topologyName',
                     help='topologyName',
                     type=str,
                     choices=['fattree', 'jellyfish'],
-                    default='fattree')
+                    default='jellyfish')
     args = parser.parse_args()
     
     if args.modelName == 'sr':

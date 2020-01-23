@@ -15,7 +15,8 @@ WEIGHTING_WEIGHT_DIFF = 10
 
 GROUPING_INTERVAL = 10000
 GROUPING_MAX_STEADY_STEPS = 1
-GROUPING_NUM_SAMPLE_NODE = 100
+GROUPING_NUM_SAMPLE_NODES = 25
+GROUPING_ERROR_RATIO = 0.01
 
 class Algorithm(AbstractAlgorithm):
     
@@ -48,7 +49,7 @@ class Algorithm(AbstractAlgorithm):
         super().__del__()
         
     def run(self):
-        self.fwCost.writerow(['time', 'cntSteady', 'cost_star', 'cost_cur'])
+        self.fwCost.writerow(['time', 'cntSteady', 'cost_prev', 'cost_new'])
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'aggrType', 'numGroups', 'tau1', 'tau2'])
         
         lr = self.args.lrInitial
@@ -97,9 +98,9 @@ class Algorithm(AbstractAlgorithm):
             if t3 % GROUPING_INTERVAL == 0:
                 # Gradient Estimation
                 (g_is__w, nid2_g_i__w) = self.model.federated_collect_gradients(w, self.c.get_nid2_D_i())
-    #             (g_is__w2, nid2_g_i__w2) = self.model.federated_collect_gradients2(w, self.c.get_nid2_D_i())
-    #             for nid in nid2_g_i__w:
-    #                 print(self.model.np_modelEquals(g_is__w[nid], g_is__w2[nid]), self.model.np_modelEquals(nid2_g_i__w[nid], nid2_g_i__w2[nid]))
+#                 (g_is__w2, nid2_g_i__w2) = self.model.federated_collect_gradients2(w, self.c.get_nid2_D_i())
+#                 for nid in nid2_g_i__w:
+#                     print(self.model.np_modelEquals(g_is__w[nid], g_is__w2[nid]), self.model.np_modelEquals(nid2_g_i__w[nid], nid2_g_i__w2[nid]))
                 g__w = np.average(g_is__w, axis=0, weights=self.c.get_p_is())
         
 #                 D_is = self.c.get_D_is()
@@ -107,7 +108,8 @@ class Algorithm(AbstractAlgorithm):
 #                 print(p_is)
 #                 p_is = [ 1 for _ in range(len(self.c.get_N())) ]
 #                 self.c.set_p_is(p_is)
-#                 self.c.digest(self.c.z)
+                self.c.invalidate()
+                self.c.digest(self.c.z, nid2_g_i__w, g__w)
 
 #                 c = self.run_IID_Weighting(self.c, nid2_g_i__w, g__w)
                 (self.c, tau1, tau2) = self.run_Grouping(self.c, nid2_g_i__w, g__w, d_budget)
@@ -117,13 +119,13 @@ class Algorithm(AbstractAlgorithm):
     def run_IID_Weighting(self, c, nid2_g_i__w, g__w, mode=1):
         print('IID Weighting Started')
         
-        c_star = c.clone()
+        c_star = c.clone(nid2_g_i__w, g__w)
         if mode == 1:
             delta_star = c.get_Delta(nid2_g_i__w, g__w)
         elif mode == 2:
-            delta_star = c.get_delta(nid2_g_i__w)
+            delta_star = c.get_delta()
         elif mode == 3:
-            delta_star = c.get_DELTA(nid2_g_i__w, g__w)
+            delta_star = c.get_DELTA()
         else:
             delta_star = c.get_emd()
         print('Initial delta_star=%.4f' % (delta_star))
@@ -149,14 +151,14 @@ class Algorithm(AbstractAlgorithm):
 #                 else:
 #                     p_is[i] = 0
 #         c.set_p_is(p_is)
-#         c.digest(c.z)
+#         c.digest(c.z, nid2_g_i__w, g__w)
         
 #         if mode == 1:
 #             delta_cur = c.get_Delta(nid2_g_i__w, g__w)
 #         elif mode == 2:
-#             delta_cur = c.get_delta(nid2_g_i__w)
+#             delta_cur = c.get_delta()
 #         elif mode == 3:
-#             delta_cur = c.get_DELTA(nid2_g_i__w, g__w)
+#             delta_cur = c.get_DELTA()
 #         else:
 #             delta_cur = c.get_emd()
 #         print('Tweaked delta_star=%.4f, delta_cur=%.4f' % (delta_star, delta_cur))
@@ -170,19 +172,19 @@ class Algorithm(AbstractAlgorithm):
         # 높은 Weight 로 변경 시도
         p_is[curIdx] += WEIGHTING_WEIGHT_DIFF
         c.set_p_is(p_is)
-        c.digest(c.z)
+        c.digest(c.z, nid2_g_i__w, g__w)
         
         if mode == 1:
             delta_up = c.get_Delta(nid2_g_i__w, g__w)
         elif mode == 2:
-            delta_up = c.get_delta(nid2_g_i__w)
+            delta_up = c.get_delta()
         elif mode == 3:
-            delta_up = c.get_DELTA(nid2_g_i__w, g__w)
+            delta_up = c.get_DELTA()
         else:
             delta_up = c.get_emd()
         if delta_star > delta_up:
             # 유리할 경우 변경
-            (c_star, delta_star) = (c.clone(), delta_up)
+            (c_star, delta_star) = (c.clone(nid2_g_i__w, g__w), delta_up)
             cntSteady = 0 # 한 번이라도 바뀌면 Steady 카운터 초기화
             cntPrint += 1
             if cntPrint % 100 == 0:
@@ -196,29 +198,28 @@ class Algorithm(AbstractAlgorithm):
             else:
                 p_is[curIdx] = 0
             c.set_p_is(p_is)
-            c.digest(c.z)
+            c.digest(c.z, nid2_g_i__w, g__w)
             
             if mode == 1:
                 delta_down = c.get_Delta(nid2_g_i__w, g__w)
             elif mode == 2:
-                delta_down = c.get_delta(nid2_g_i__w)
+                delta_down = c.get_delta()
             elif mode == 3:
-                delta_down = c.get_DELTA(nid2_g_i__w, g__w)
+                delta_down = c.get_DELTA()
             else:
                 delta_down = c.get_emd()
             if delta_star > delta_down:
                 # 유리할 경우 변경
-                (c_star, delta_star) = (c.clone(), delta_down)
+                (c_star, delta_star) = (c.clone(nid2_g_i__w, g__w), delta_down)
                 cntSteady = 0 # 한 번이라도 바뀌면 Steady 카운터 초기화
                 cntPrint += 1
                 if cntPrint % 100 == 0:
                     print('delta_star=%.4f, delta_cur=%.4f' % (delta_star, delta_down))
-                    self.fwCost.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, delta_star, delta_down])
             else:
                 # 유리하지 않을 경우, 다시 원래대로 초기화
                 p_is[curIdx] += WEIGHTING_WEIGHT_DIFF
                 c.set_p_is(p_is)
-                c.digest(c.z)
+                c.digest(c.z, nid2_g_i__w, g__w)
                 cntSteady += 1
         return (c_star, delta_star, cntSteady, cntPrint)
     
@@ -230,54 +231,54 @@ class Algorithm(AbstractAlgorithm):
         d_global = c_star.get_d_global(True)
         d_group = c_star.get_d_group(True)
         tau1 = 1
-        if d_group < d_global:
-            tau2 = max( int((d_budget + d_group - d_global) / d_group), 1 )
-        else:
-            tau2 = 2
+        tau2 = 5
+#         if d_group < d_global:
+#             tau2 = max( int((d_budget + d_group - d_global) / d_group), 1 )
+#         else:
+#             tau2 = 2
         print('Final cost_star=%.4f, tau1=%d, tau2=%d' % (cost_star, tau1, tau2))
         
         print('IID Grouping Finished')
         return c_star, tau1, tau2
     
+    def isGreaterThan(self, lhs, rhs):
+        return (lhs - rhs) > (GROUPING_ERROR_RATIO * rhs)
+    
     def run_GroupingInternal(self, c, nid2_g_i__w, g__w):
         # 최적 초기화
-        c_star = c.clone()
-        cost_star = self.getCost(c_star, nid2_g_i__w, g__w)
+        c_star = c.clone(nid2_g_i__w, g__w)
+        cost_star = self.getCost(c_star)
         print('Initial cost_star=%.4f' % (cost_star))
         self.fwCost.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), 0, cost_star, cost_star])
         
         cntSteady = 0
         while cntSteady < GROUPING_MAX_STEADY_STEPS:
+            cost_prev = cost_star
             cost_cur = self.iterate_Grouping(c, nid2_g_i__w, g__w)
-            if cost_star > cost_cur:
-                (c_star, cost_star) = (c.clone(), cost_cur)
+            if self.isGreaterThan(cost_star, cost_cur):
+                (c_star, cost_star) = (c.clone(nid2_g_i__w, g__w), cost_cur)
                 cntSteady = 0 # 한 번이라도 바뀌면 Steady 카운터 초기화
             else:
                 cntSteady += 1
-            print('cntSteady=%d, cost_star=%.4f, cost_cur=%.4f' % (cntSteady, cost_star, cost_cur))
-            self.fwCost.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, cost_star, cost_cur])
+            cost_new = cost_star
+            self.fwCost.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), cntSteady, cost_prev, cost_new])
+            print('cntSteady=%d, cost_prev=%.4f, cost_new=%.4f' % (cntSteady, cost_prev, cost_new))
         return (c_star, cost_star)
     
-    def getCost(self, c, nid2_g_i__w, g__w):
-        return c.get_DELTA(nid2_g_i__w, g__w)
-    
-    def checkIntegrity(self, c, z_candidate):
-        nids_byGid = fl_data.to_nids_byGid(z_candidate)
-        numClassesPerGroup = np.mean([ len(np.unique(np.concatenate([c.D_byNid[nid]['y'] for nid in nids]))) for nids in nids_byGid ])
-        # 그룹의 데이터 분포가 IID 인지 검사
-        return numClassesPerGroup == self.model.numClasses
+    def getCost(self, c):
+        return c.get_DELTA()
     
     def iterate_Grouping(self, c, nid2_g_i__w, g__w):
-        cost_cur = self.getCost(c, nid2_g_i__w, g__w)
+        cost_cur = self.getCost(c)
 
         # Iteration 마다 탐색 인덱스 셔플
         idx_Nid1 = np.arange(len(c.get_N()))
         np.random.shuffle(idx_Nid1)
-        idx_Nid1 = idx_Nid1[:GROUPING_NUM_SAMPLE_NODE]
+        idx_Nid1 = idx_Nid1[:GROUPING_NUM_SAMPLE_NODES]
 
         idx_Nid2 = np.arange(len(c.get_N()))
         np.random.shuffle(idx_Nid2)
-        idx_Nid2 = idx_Nid2[:GROUPING_NUM_SAMPLE_NODE]
+        idx_Nid2 = idx_Nid2[:GROUPING_NUM_SAMPLE_NODES]
         
         z = c.z
         for i in idx_Nid1:
@@ -289,20 +290,12 @@ class Algorithm(AbstractAlgorithm):
                 temp_k = z[i]
                 z[i] = z[j]
                 z[j] = temp_k
-                
-                if self.checkIntegrity(c, z) == False:
-                    # 무결성을 만족 못할 경우, 다시 원래대로 그룹 멤버쉽 초기화
-                    temp_k = z[i]
-                    z[i] = z[j]
-                    z[j] = temp_k
-                    continue
                     
                 # 한 그룹에 노드가 전부 없어지는 것은 있을 수 없는 경우
-                if c.digest(z) == False: raise Exception(str(z))
+                if c.digest(z, nid2_g_i__w, g__w) == False: raise Exception(str(z))
                     
                 # 다음 후보에 대한 Cost 계산
-                cost_next = self.getCost(c, nid2_g_i__w, g__w)
-                
+                cost_next = self.getCost(c)
                 if cost_cur > cost_next:
                     # 유리할 경우 변경
                     cost_cur = cost_next
@@ -314,5 +307,5 @@ class Algorithm(AbstractAlgorithm):
             print(i, cost_cur)
     
         # 마지막 멤버십 초기화가 발생했을 수도 있으므로, Cloud Digest 시도
-        if c.digest(z) == False: raise Exception(str(z))
+        if c.digest(z, nid2_g_i__w, g__w) == False: raise Exception(str(z))
         return cost_cur
