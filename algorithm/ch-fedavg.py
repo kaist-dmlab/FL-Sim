@@ -6,6 +6,7 @@ from time import gmtime, strftime
 
 from algorithm.abc import AbstractAlgorithm
 
+from cloud.cloud import Cloud
 import fl_const
 import fl_data
 
@@ -17,7 +18,7 @@ WEIGHTING_WEIGHT_DIFF = 10
 GROUPING_INTERVAL = 10000
 GROUPING_MAX_STEADY_STEPS = 1
 GROUPING_NUM_SAMPLE_NODES = 25
-GROUPING_ERROR_RATIO = 0.01
+GROUPING_ERROR_THRESHOLD = 0.01
 
 class Algorithm(AbstractAlgorithm):
     
@@ -29,8 +30,8 @@ class Algorithm(AbstractAlgorithm):
     
     def getFileName(self):
         d_budget = self.args.opaque1
-        return self.args.modelName + '-' + self.args.dataName + '-' + self.args.algName + '-' \
-                + self.args.nodeType + self.args.edgeType + '-' + str(d_budget)
+        return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
+                + self.args.nodeType + self.args.edgeType + '_' + str(d_budget)
     
     def getApprCommCostGroup(self):
         return self.c.get_hpp_group(True) * 2
@@ -45,13 +46,14 @@ class Algorithm(AbstractAlgorithm):
         return self.c.get_d_global(True, linkSpeed) * 3
     
     def __init__(self, args):
-        super().__init__(args, randomEnabled=True)
+        super().__init__(args)
         
-        z_rand = groupRandomly(args.numNodes, args.numGroups)
+        self.c = Cloud(self.c.topology, self.c.D_byNid, args.numGroups)
+        z_rand = self.groupRandomly(args.numNodes, args.numGroups)
         self.c.digest(z_rand)
         
         fileName = self.getFileName()
-        self.fileCost = open(os.path.join(fl_const.LOG_DIR_NAME, fileName + '-' + COST_CSV_POSTFIX), 'w', newline='', buffering=1)
+        self.fileCost = open(os.path.join(fl_const.LOG_DIR_NAME, fileName + '_' + COST_CSV_POSTFIX), 'w', newline='', buffering=1)
         self.fwCost = csv.writer(self.fileCost, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         
     def __del__(self):
@@ -252,7 +254,7 @@ class Algorithm(AbstractAlgorithm):
         return c_star, tau1, tau2
     
     def isGreaterThan(self, lhs, rhs):
-        return (lhs - rhs) > (GROUPING_ERROR_RATIO * rhs)
+        return (lhs - rhs) > (GROUPING_ERROR_THRESHOLD * rhs)
     
     def run_GroupingInternal(self, c, nid2_g_i__w, g__w):
         # 최적 초기화

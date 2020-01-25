@@ -1,3 +1,6 @@
+from wurlitzer import pipes
+import subprocess
+
 import networkx as nx
 import ns.core
 import ns.internet
@@ -5,10 +8,11 @@ import ns.applications
 import ns.network
 
 import numpy as np
-import subprocess
 import os
 
 from abc import ABC, abstractmethod
+
+import fl_const
 
 LINK_DELAY = '1ms'
 SIM_DATA_SIZE = 4000
@@ -71,10 +75,9 @@ class AbstractTopology(ABC):
         if edgeCombineEnabled:
             commPairs = self.combineCommPairs(commPairs)
         
-        def removeFilesInDir(dirPath):
-            for f in os.listdir(dirPath):
-                os.remove('pcap/' + f)
-        removeFilesInDir('pcap')
+        # remove pcap files in advance
+        for f in os.listdir(fl_const.PCAP_DIR_NAME):
+            os.remove(os.path.join(fl_const.PCAP_DIR_NAME, f))
         
         (p2p, nodes, xips) = self.createSimNetwork(linkSpeed, LINK_DELAY)
         
@@ -107,7 +110,7 @@ class AbstractTopology(ABC):
             sinkAppsList.append(sinkApps)
             
         ascii = ns.network.AsciiTraceHelper()
-        p2p.EnablePcap('pcap/topology', nodes, False)
+        p2p.EnablePcap(os.path.join(fl_const.PCAP_DIR_NAME, 'topology'), nodes, False)
         
 #         print('Total Bytes Sent :', totalBytesSent)
         ns.core.Simulator.Stop(ns.core.Seconds(STOP_TIME))
@@ -128,7 +131,11 @@ class AbstractTopology(ABC):
             # 10: Network Simulation 을 빨리 하기 위해 1MBps/1000크기(10MBps/10000크기와 유사한 결과)로 했으므로 데이터 크기를 10 더 나눠줌
             return d / (SIM_DATA_SIZE * 10) * self.modelSize
 #         print('Total Bytes Received :', sum( ns.applications.PacketSink(sinkApps.Get(0)).GetTotalRx() for sinkApps in sinkAppsList ))
-        maxPcapTime = max( getPcapTime('pcap/' + fileName) for fileName in os.listdir('pcap') )
+        
+        c_log_file = open(os.path.join(fl_const.LOG_DIR_NAME, fl_const.C_LOG_FILE_NAME), 'a')
+        with pipes(stdout=c_log_file, stderr=c_log_file):
+            maxPcapTime = max( getPcapTime(os.path.join(fl_const.PCAP_DIR_NAME, fileName)) for fileName in os.listdir(fl_const.PCAP_DIR_NAME) )
+        c_log_file.close()
         if maxPcapTime == -1: raise Exception()
         maxPcapSec = toSec(maxPcapTime)
         return maxPcapSec

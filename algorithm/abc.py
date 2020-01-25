@@ -10,6 +10,7 @@ import collections
 from abc import ABC, abstractmethod
 
 from cloud.cloud import Cloud
+from visualization.util import saveGraphOfLog
 import fl_const
 import fl_data
 import fl_util
@@ -39,9 +40,9 @@ class AbstractAlgorithm(ABC):
             self.model = Model(args, self.trainData_by1Nid, self.testData_by1Nid)
         c_log_file.close()
         
-        fileName = self.getFileName()
-        print(fileName)
-        self.fileEpoch = open(os.path.join(fl_const.LOG_DIR_NAME, fileName + '_' + fl_const.EPOCH_CSV_POSTFIX), 'w', newline='', buffering=1)
+        fileNameBase = self.getFileName()
+        print(fileNameBase)
+        self.fileEpoch = open(os.path.join(fl_const.LOG_DIR_NAME, fileNameBase + '_' + fl_const.EPOCH_CSV_POSTFIX), 'w', newline='', buffering=1)
         self.fwEpoch = csv.writer(self.fileEpoch, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         
         (trainData_byNid, z_edge) = fl_data.groupByEdge(self.trainData_by1Nid, args.nodeType, args.edgeType, args.numNodes, args.numEdges)
@@ -56,8 +57,12 @@ class AbstractAlgorithm(ABC):
         topologyModule = importlib.import_module(topologyPackagePath)
         Topology = getattr(topologyModule, 'Topology')
         topology = Topology(self.model.size, args.numNodes, args.numEdges)
-        self.c = Cloud(topology, trainData_byNid, args.numGroups)
+        self.c = Cloud(topology, trainData_byNid, args.numEdges)
         self.c.digest(z_edge)
+        # Note that the cloud c is initialized with numEdges instead of numGroups
+        # because the concept of groups is not considered by most of algorithms
+        # But, for those algorithms that care about the concept of groups like ch-fedavg,
+        # the cloud c needs to be re-initialized with different numGroups
         
         print('Profiling Delays...')
         self.speed2Delay = {}
@@ -84,9 +89,8 @@ class AbstractAlgorithm(ABC):
         self.fileEpoch.close()
         print()
         
-        flopOpsPerEpoch = self.getFlopOpsPerEpoch()
-        
-        totalComps = self.epoch * flopOpsPerEpoch
+        print('Dump Json...')
+        totalComps = self.epoch * self.getFlopOpsPerEpoch()
         totalComms = self.getTotalComms()
         metadata = { 'args': vars(self.args),
                     'modelFlopOps': self.model.flopOps,
@@ -99,10 +103,19 @@ class AbstractAlgorithm(ABC):
                     'self.d_group': self.d_group,
                     'self.d_global': self.d_global
                    }
-        fileName = self.getFileName()
-        fl_util.dumpJson(os.path.join(fl_const.LOG_DIR_NAME, fileName + '.json'), metadata)
+        fileNameBase = self.getFileName()
+        fl_util.dumpJson(os.path.join(fl_const.LOG_DIR_NAME, fileNameBase + '.json'), metadata)
         
-        print('dumpTimeLogs')
+        print('Dump Graph...')
+        filePathEpoch = os.path.join(fl_const.LOG_DIR_NAME, fileNameBase + '_' + fl_const.EPOCH_CSV_POSTFIX)
+        saveGraphOfLog(filePathEpoch, 0, 2)
+        
+        # remove all the previous time logs manually
+        for fileName in os.listdir(fl_const.LOG_DIR_NAME):
+            if fileName.startswith(fileNameBase) and fileName.endswith(fl_const.TIME_CSV_POSTFIX):
+                os.remove(os.path.join(fl_const.LOG_DIR_NAME, fileName))
+                
+        print('Dump Time Logs...')
         for procSpeed in self.args.procSpeeds:
             for linkSpeed in self.args.linkSpeeds:
                 self.dumpTimeLogs(procSpeed, linkSpeed)
@@ -137,8 +150,8 @@ class AbstractAlgorithm(ABC):
     def getTotalComms(self):
         if self.args.algName == 'cgd': return 0
         
-        fileName = self.getFileName()
-        fileEpoch = open(os.path.join(fl_const.LOG_DIR_NAME, fileName + '_' + fl_const.EPOCH_CSV_POSTFIX), 'r')
+        fileNameBase = self.getFileName()
+        fileEpoch = open(os.path.join(fl_const.LOG_DIR_NAME, fileNameBase + '_' + fl_const.EPOCH_CSV_POSTFIX), 'r')
         line = fileEpoch.readline() # 제목 줄 제외
         tokens = line.rstrip('\n').split(',')
         if tokens[3] != 'aggrType': raise Exception(line)
@@ -160,11 +173,20 @@ class AbstractAlgorithm(ABC):
         (d_group, d_global) = self.speed2Delay[linkSpeed]
         print('d_local:', d_local, ', d_group:', d_group, ', d_global:', d_global)
         
-        fileName = self.getFileName()
-        fileEpoch = open(os.path.join(fl_const.LOG_DIR_NAME, fileName + '_' + fl_const.EPOCH_CSV_POSTFIX), 'r')
-        fileEpoch.readline() # 제목 줄 제외
-        fileTime = open(os.path.join(fl_const.LOG_DIR_NAME, fileName + '_' + str(procSpeed) + '_' + str(linkSpeed) + '_' + fl_const.TIME_CSV_POSTFIX), 'w', newline='', buffering=1)
-        print(os.path.join(fl_const.LOG_DIR_NAME, fileName + '_' + str(procSpeed) + '_' + str(linkSpeed) + '_' + fl_const.TIME_CSV_POSTFIX))
+        # get accuracy in advance
+        fileNameBase = self.getFileName()
+        fileEpoch = open(os.path.join(fl_const.LOG_DIR_NAME, fileNameBase + '_' + fl_const.EPOCH_CSV_POSTFIX), 'r')
+        lines = fileEpoch.readlines()
+        tokens = lines[-1].rstrip('\n').split(',')
+        accuracy = tokens[2]
+        
+        # create time log file
+        fileEpoch = open(os.path.join(fl_const.LOG_DIR_NAME, fileNameBase + '_' + fl_const.EPOCH_CSV_POSTFIX), 'r')
+        fileEpoch.readline() # ignore the first title line
+        
+        fileNameTime = '%s_%d_%d_%.3f_%s' % (fileNameBase, procSpeed, linkSpeed, float(accuracy), fl_const.TIME_CSV_POSTFIX)
+        print(fileNameTime)
+        fileTime = open(os.path.join(fl_const.LOG_DIR_NAME, fileNameTime), 'w', newline='', buffering=1)
         fwTime = csv.writer(fileTime, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         fwTime.writerow(['time', 'loss', 'accuracy', 'epoch', 'aggrType'])
         refDict = {}
