@@ -1,4 +1,6 @@
 import importlib
+from wurlitzer import pipes
+
 import numpy as np
 import os
 import csv
@@ -8,20 +10,11 @@ import collections
 from abc import ABC, abstractmethod
 
 from cloud.cloud import Cloud
+import fl_const
 import fl_data
 import fl_util
 
-LOG_DIR_NAME = 'log'
-EPOCH_CSV_POSTFIX = 'epoch.csv'
-TIME_CSV_POSTFIX = 'time.csv'
-
 PRINT_INTERVAL = 0.5
-    
-def groupRandomly(numNodes, numGroups):
-    numNodesPerGroup = fl_data.partitionSumRandomly(numNodes, numGroups)
-    z_rand = [ i for (i, numNodes) in enumerate(numNodesPerGroup) for _ in range(numNodes) ]
-    np.random.shuffle(z_rand)
-    return z_rand
 
 class AbstractAlgorithm(ABC):
     
@@ -29,7 +22,7 @@ class AbstractAlgorithm(ABC):
     def getFileName(self):
         pass
     
-    def __init__(self, args, randomEnabled=False):
+    def __init__(self, args):
         self.args = args
         
         self.trainData_by1Nid = fl_util.deserialize(os.path.join('data', args.dataName, 'train'))
@@ -38,10 +31,18 @@ class AbstractAlgorithm(ABC):
         else:
             self.testData_by1Nid = fl_util.deserialize(os.path.join('data', args.dataName, 'test'))
             
-        modelPackagePath = 'model.' + args.modelName
-        modelModule = importlib.import_module(modelPackagePath)
-        Model = getattr(modelModule, 'Model')
-        self.model = Model(args, self.trainData_by1Nid, self.testData_by1Nid)
+        c_log_file = open(os.path.join(fl_const.LOG_DIR_NAME, fl_const.C_LOG_FILE_NAME), 'a')
+        with pipes(stdout=c_log_file, stderr=c_log_file):
+            modelPackagePath = 'model.' + args.modelName
+            modelModule = importlib.import_module(modelPackagePath)
+            Model = getattr(modelModule, 'Model')
+            self.model = Model(args, self.trainData_by1Nid, self.testData_by1Nid)
+        c_log_file.close()
+        
+        fileName = self.getFileName()
+        print(fileName)
+        self.fileEpoch = open(os.path.join(fl_const.LOG_DIR_NAME, fileName + '_' + fl_const.EPOCH_CSV_POSTFIX), 'w', newline='', buffering=1)
+        self.fwEpoch = csv.writer(self.fileEpoch, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         
         (trainData_byNid, z_edge) = fl_data.groupByEdge(self.trainData_by1Nid, args.nodeType, args.edgeType, args.numNodes, args.numEdges)
 #         print('Num Data per Node:', [ len(D_i['x']) for D_i in trainData_byNid ])
@@ -51,21 +52,12 @@ class AbstractAlgorithm(ABC):
 #         print('Num Class per Node Counter:', counter)
         print('Shape of trainData on 1st node:', trainData_byNid[0]['x'].shape, trainData_byNid[0]['y'].shape)
         
-        fileName = self.getFileName()
-        print(fileName)
-        self.fileEpoch = open(os.path.join(LOG_DIR_NAME, fileName + '_' + EPOCH_CSV_POSTFIX), 'w', newline='', buffering=1)
-        self.fwEpoch = csv.writer(self.fileEpoch, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        
         topologyPackagePath = 'cloud.' + args.topologyName
         topologyModule = importlib.import_module(topologyPackagePath)
         Topology = getattr(topologyModule, 'Topology')
         topology = Topology(self.model.size, args.numNodes, args.numEdges)
         self.c = Cloud(topology, trainData_byNid, args.numGroups)
-        if randomEnabled == False:
-            self.c.digest(z_edge)
-        else:
-            z_rand = groupRandomly(args.numNodes, args.numGroups)
-            self.c.digest(z_rand)
+        self.c.digest(z_edge)
         
         print('Profiling Delays...')
         self.speed2Delay = {}
@@ -108,7 +100,7 @@ class AbstractAlgorithm(ABC):
                     'self.d_global': self.d_global
                    }
         fileName = self.getFileName()
-        fl_util.dumpJson(os.path.join(LOG_DIR_NAME, fileName + '.json'), metadata)
+        fl_util.dumpJson(os.path.join(fl_const.LOG_DIR_NAME, fileName + '.json'), metadata)
         
         print('dumpTimeLogs')
         for procSpeed in self.args.procSpeeds:
@@ -146,7 +138,7 @@ class AbstractAlgorithm(ABC):
         if self.args.algName == 'cgd': return 0
         
         fileName = self.getFileName()
-        fileEpoch = open(os.path.join(LOG_DIR_NAME, fileName + '_' + EPOCH_CSV_POSTFIX), 'r')
+        fileEpoch = open(os.path.join(fl_const.LOG_DIR_NAME, fileName + '_' + fl_const.EPOCH_CSV_POSTFIX), 'r')
         line = fileEpoch.readline() # 제목 줄 제외
         tokens = line.rstrip('\n').split(',')
         if tokens[3] != 'aggrType': raise Exception(line)
@@ -169,10 +161,10 @@ class AbstractAlgorithm(ABC):
         print('d_local:', d_local, ', d_group:', d_group, ', d_global:', d_global)
         
         fileName = self.getFileName()
-        fileEpoch = open(os.path.join(LOG_DIR_NAME, fileName + '_' + EPOCH_CSV_POSTFIX), 'r')
+        fileEpoch = open(os.path.join(fl_const.LOG_DIR_NAME, fileName + '_' + fl_const.EPOCH_CSV_POSTFIX), 'r')
         fileEpoch.readline() # 제목 줄 제외
-        fileTime = open(os.path.join(LOG_DIR_NAME, fileName + '_' + str(procSpeed) + '_' + str(linkSpeed) + '_' + TIME_CSV_POSTFIX), 'w', newline='', buffering=1)
-        print(os.path.join(LOG_DIR_NAME, fileName + '_' + str(procSpeed) + '_' + str(linkSpeed) + '_' + TIME_CSV_POSTFIX))
+        fileTime = open(os.path.join(fl_const.LOG_DIR_NAME, fileName + '_' + str(procSpeed) + '_' + str(linkSpeed) + '_' + fl_const.TIME_CSV_POSTFIX), 'w', newline='', buffering=1)
+        print(os.path.join(fl_const.LOG_DIR_NAME, fileName + '_' + str(procSpeed) + '_' + str(linkSpeed) + '_' + fl_const.TIME_CSV_POSTFIX))
         fwTime = csv.writer(fileTime, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         fwTime.writerow(['time', 'loss', 'accuracy', 'epoch', 'aggrType'])
         refDict = {}

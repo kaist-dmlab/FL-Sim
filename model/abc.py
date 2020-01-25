@@ -39,9 +39,6 @@ class AbstractModel(ABC):
         self.x_shape = trainData_by1Nid[0]['x'].shape
         self.numClasses = len(np.unique(trainData_by1Nid[0]['y']))
         
-        # Suppress tf warnings
-        tf.logging.set_verbosity(tf.logging.WARN)
-        
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         

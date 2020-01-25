@@ -13,6 +13,10 @@ class Algorithm(AbstractAlgorithm):
     def getCommTimeGlobal(self, linkSpeed):
         return self.c.get_d_global(False, linkSpeed) * 2
     
+    def __init__(self, args):
+        args.numGroups = 1
+        super().__init__(args)
+    
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'aggrType'])
         

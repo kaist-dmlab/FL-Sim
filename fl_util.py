@@ -52,11 +52,11 @@ def parseArgs():
     parser.add_argument('--numGroups',
                     help='numGroups',
                     type=int,
-                    default=20)
+                    default=10)
     parser.add_argument('--sgdEnabled',
                     help='sgdEnabled',
                     type=bool,
-                    default=False)
+                    default=True)
     parser.add_argument('--maxEpoch',
                     help='maxEpoch',
                     type=int,
@@ -96,7 +96,7 @@ def parseArgs():
     parser.add_argument('--isValidation',
                     help='isValidation',
                     type=bool,
-                    default=False)
+                    default=True)
     parser.add_argument('--topologyName',
                     help='topologyName',
                     type=str,
@@ -107,12 +107,15 @@ def parseArgs():
     if args.modelName == 'sr':
         if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
         args.maxTime = 100
+        args.sgdEnabled = False
     elif args.modelName == '1nn':
         if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
         args.maxTime = 1000
+        args.sgdEnabled = False
     elif args.modelName == '2nn':
         if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
         args.maxTime = 1000
+        args.sgdEnabled = False
     elif args.modelName == 'cnn-mnist':
         if not(args.dataName == 'mnist-o'
                or args.dataName == 'mnist-f'
@@ -131,13 +134,10 @@ def parseArgs():
         raise Exception(args.modelName)
         
     if args.dataName == 'cifar10':
-        args.sgdEnabled = True
         args.lrInitial = 0.01
     elif args.dataName == 'femnist':
-        args.sgdEnabled = True
         args.lrInitial = 0.06 # LEAF Paper
     elif args.dataName == 'celeba':
-        args.sgdEnabled = True
         args.lrInitial = 0.001 # LEAF Paper
     return args
 

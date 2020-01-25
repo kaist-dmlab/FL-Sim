@@ -5,9 +5,10 @@ import random
 from time import gmtime, strftime
 
 from algorithm.abc import AbstractAlgorithm
+
+import fl_const
 import fl_data
 
-LOG_DIR_NAME = 'log'
 COST_CSV_POSTFIX = 'cost.csv'
 
 WEIGHTING_MAX_STEADY_STEPS = 100
@@ -20,10 +21,16 @@ GROUPING_ERROR_RATIO = 0.01
 
 class Algorithm(AbstractAlgorithm):
     
+    def groupRandomly(self, numNodes, numGroups):
+        numNodesPerGroup = fl_data.partitionSumRandomly(numNodes, numGroups)
+        z_rand = [ i for (i, numNodes) in enumerate(numNodesPerGroup) for _ in range(numNodes) ]
+        np.random.shuffle(z_rand)
+        return z_rand
+    
     def getFileName(self):
         d_budget = self.args.opaque1
-        return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + self.args.nodeType + self.args.edgeType + '_' + str(d_budget)
+        return self.args.modelName + '-' + self.args.dataName + '-' + self.args.algName + '-' \
+                + self.args.nodeType + self.args.edgeType + '-' + str(d_budget)
     
     def getApprCommCostGroup(self):
         return self.c.get_hpp_group(True) * 2
@@ -40,8 +47,11 @@ class Algorithm(AbstractAlgorithm):
     def __init__(self, args):
         super().__init__(args, randomEnabled=True)
         
+        z_rand = groupRandomly(args.numNodes, args.numGroups)
+        self.c.digest(z_rand)
+        
         fileName = self.getFileName()
-        self.fileCost = open(os.path.join(LOG_DIR_NAME, fileName + '_' + COST_CSV_POSTFIX), 'w', newline='', buffering=1)
+        self.fileCost = open(os.path.join(fl_const.LOG_DIR_NAME, fileName + '-' + COST_CSV_POSTFIX), 'w', newline='', buffering=1)
         self.fwCost = csv.writer(self.fileCost, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         
     def __del__(self):
@@ -53,7 +63,7 @@ class Algorithm(AbstractAlgorithm):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'aggrType', 'numGroups', 'tau1', 'tau2'])
         
         lr = self.args.lrInitial
-        input_w_ks = [ self.model.getParams() for _ in self.c.groups ]
+        input_w_ks = [ self.model.getParams() for _ in self.c.groups ] # Group 수 개수 변화 있을 때 처리방법?
         d_budget = self.args.opaque1
         
         self.epoch = 0 ; epoch_prev = 0
@@ -304,7 +314,7 @@ class Algorithm(AbstractAlgorithm):
                     temp_k = z[i]
                     z[i] = z[j]
                     z[j] = temp_k
-            print(i, cost_cur)
+            print('nid: %3d\tcurrent cost: %.4f' % (i, cost_cur))
     
         # 마지막 멤버십 초기화가 발생했을 수도 있으므로, Cloud Digest 시도
         if c.digest(z, nid2_g_i__w, g__w) == False: raise Exception(str(z))

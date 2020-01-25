@@ -5,8 +5,8 @@ class Algorithm(AbstractAlgorithm):
     def getFileName(self):
         tau1 = int(self.args.opaque1)
         tau2 = int(self.args.opaque2)
-        return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + self.args.nodeType + self.args.edgeType + '_' + str(tau1) + '_' + str(tau2)
+        return self.args.modelName + '-' + self.args.dataName + '-' + self.args.algName + '-' \
+                + self.args.nodeType + self.args.edgeType + '-' + str(tau1) + '-' + str(tau2)
     
     def getApprCommCostGroup(self):
         return self.c.get_hpp_group(False) * 2
@@ -20,6 +20,10 @@ class Algorithm(AbstractAlgorithm):
     def getCommTimeGlobal(self, linkSpeed):
         return self.c.get_d_global(False, linkSpeed) * 2
     
+    def __init__(self, args):
+        args.numGroups = args.numEdges
+        super().__init__(args)
+        
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'aggrType'])
         
