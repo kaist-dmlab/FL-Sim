@@ -7,11 +7,25 @@ def sample(data_by1Nid, numSamples):
     return [ { 'x': data_by1Nid[0]['x'][:numSamples], 'y': data_by1Nid[0]['y'][:numSamples] } ]
 
 def to_nids_byGid(z):
-    gids = np.unique(z)
+    gids = np.unique([gid for gid in z if isinstance(gid, int)])
     for gid in range(len(gids)):
         if not(gid in gids): return None
     nids_byGid = [ [ nid for nid, gid in enumerate(z) if gid == gid_ ] for gid_ in gids ]
     return nids_byGid
+
+def to_z(numNodes, nids_byGid):
+    # nids_byGid 에 없는 nid 가 있을 수도 있으므로 numNodes 를 입력받고, 모두 None 으로 초기화
+    z = [ None for _ in range(numNodes) ]
+    for gid, nids in enumerate(nids_byGid):
+        for nid in nids:
+            z[nid] = gid
+    return z
+
+def groupRandomly(numNodes, numGroups):
+    numNodesPerGroup = partitionSumRandomly(numNodes, numGroups)
+    z_rand = [ i for (i, numNodes) in enumerate(numNodesPerGroup) for _ in range(numNodes) ]
+    np.random.shuffle(z_rand)
+    return z_rand
 
 def groupByClass(data_by1Nid):
     data_byClass = []
@@ -20,20 +34,27 @@ def groupByClass(data_by1Nid):
         data_byClass.append({ 'x': data_by1Nid[0]['x'][idxExamplesForC], 'y': data_by1Nid[0]['y'][idxExamplesForC] })
     return data_byClass
 
-def partitionSumRandomly(numSamples, numNodes):    
-    if numNodes == 1: return [ numSamples ]
+def partitionSumRandomly(targetSum, numPartitions):
+    assert( targetSum >= numPartitions )
+    if numPartitions == 1: return [ targetSum ]
     
-    # 0을 방지하기 위해 Half Random, Half Uniform
     mu, sigma = 0, 1 # 표준 정규분포로 Sample 개수 가중치 생성
-    while True:
-        weights = np.random.normal(mu, sigma, numNodes)
-#         weights = np.random.exponential(scale=1000, size=numNodes)
-        weights = 0.8 * (weights - np.min(weights)) / (np.max(weights) - np.min(weights)) + 0.1 # 모두 0보다 크게 하기 위해 0.1 ~ 0.9 범위로 정규화
-        weightSum = sum(weights)
-        ps = [ int(numSamples*weights[i]/weightSum) for i in range(numNodes) ]
-        ps[-1] += numSamples - sum(ps) # int 내림으로 인해 부족한 부분 채우기
-        if np.all(np.array(ps) > 0): break
-    assert( numSamples == sum(ps) )
+    weights = np.random.normal(mu, sigma, numPartitions)
+#     weights = np.random.exponential(scale=1000, size=numPartitions)
+    weights = 0.8 * (weights - np.min(weights)) / (np.max(weights) - np.min(weights)) + 0.1 # 모두 0보다 크게 하기 위해 0.1 ~ 0.9 범위로 정규화
+    weightSum = sum(weights)
+    ps = [ max(int(targetSum*weights[i]/weightSum), 1) for i in range(numPartitions) ] # 최소 한개 보장하기 위한 max(,1)
+    if sum(ps) <= targetSum:
+        # 부족할 경우 부족한 부분 채우기
+        ps[-1] += targetSum - sum(ps)
+    else:
+        # 넘칠 경우 랜덤으로 넘치는 부분 줄이기
+        cntIdx = 0
+        while sum(ps) > targetSum:
+            curIdx = cntIdx % numPartitions
+            ps[curIdx] = ps[curIdx]-1 if ps[curIdx]>1 else ps[curIdx]
+            cntIdx += 1
+    assert( sum(ps) == targetSum )
     return ps
 
 def groupByNode_old(data_by1Nid, nodeType, numNodes):
@@ -150,8 +171,9 @@ def groupByEdge_old(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
         raise Exception(nodeType, edgeType)
     data_byNid = groupByNode_old(data_by1Nid, nodeType, numNodes)
     data_byNid = np.array([ data_byNid[nid] for nids in nids_byEid for nid in nids ]) # Node 오름차순으로 데이터 정렬
-    z = [ eid for eid in range(numEdges) for _ in range(numNodesPerEdge) ]
-    return (data_byNid, z)
+    z_edge = [ eid for eid in range(numEdges) for _ in range(numNodesPerEdge) ]
+    return (data_byNid, z_edge)
+
 def sample_truncated_normal(mean=1, sd=1, low=1, upp=10, size=1):
     if (low == upp): # NUM_CLASS_NODE = NUM_CLASS_EDGE인 경우-->한 EDGE내 모든 NODE는 같은 CLASS를 가짐. 
         sampled = [int(np.rint(low))]*size
@@ -342,12 +364,12 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
         NUM_DATA_PER_SAMPLED_CLASS.append(DATA_BY_CLASS[i]['x'].shape[0]/Class_Counter[i])
     
     trainData_byNid = []
-    train_z = []
+    z_edge = []
     
     for edge_ind in range(NUM_EDGES):
         for node_class_list in EDGE_NODE_CLASS_LIST[edge_ind]:
             initial_counter = 0
-            train_z.append(edge_ind)
+            z_edge.append(edge_ind)
             for i in node_class_list: # i-th node
                 if initial_counter == 0: # make initial x,y dictionary for each node
                     num_sampled = sample_truncated_normal(mean=NUM_DATA_PER_SAMPLED_CLASS[i], sd = 1, low=1, upp=2*NUM_DATA_PER_SAMPLED_CLASS[i], size=1)[0] # number of datapoint for a class in a node
@@ -386,7 +408,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
                         DATA_BY_CLASS[i]['y'] = np.delete(DATA_BY_CLASS[i]['y'], indice_sampled,0)
                         NUM_DATA_PER_CLASS[i] = 0
 
-    nids_byGid = to_nids_byGid(train_z)
+    nids_byGid = to_nids_byGid(z_edge)
     trainData_byNid_NODE_CLASS_LIST = [np.unique(trainData_byNid[nid]['y']).tolist() for nids in nids_byGid for nid in nids]
     for i in range(NUM_CLASS):
         if NUM_DATA_PER_CLASS[i] != 0:
@@ -417,4 +439,4 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
         datanum += len(node['x'])
     assert(datanum == len(data_by1Nid[0]['x']))
     
-    return (trainData_byNid, train_z)
+    return (trainData_byNid, z_edge)

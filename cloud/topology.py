@@ -1,5 +1,8 @@
 from wurlitzer import pipes
+import os
 import subprocess
+import numpy as np
+import re
 
 import networkx as nx
 import ns.core
@@ -7,23 +10,16 @@ import ns.internet
 import ns.applications
 import ns.network
 
-import numpy as np
-import os
-
 from abc import ABC, abstractmethod
-
 import fl_const
 
 LINK_DELAY = '1ms'
-SIM_DATA_SIZE = 4000
-PACKET_SIZE = 1000
 PORT = 9
 STOP_TIME = 10.0
 
 class AbstractTopology(ABC):
     
-    def __init__(self, modelSize, numNodes, numEdges):
-        self.modelSize = modelSize
+    def __init__(self, numNodes, numEdges):
         self.numNodes = numNodes
         self.numEdges = numEdges
         
@@ -53,11 +49,11 @@ class AbstractTopology(ABC):
         commPairs = inEdgeCommPairs + list(combinedCommPairs.values())
         return commPairs
     
-    def getSumOfHopsPerPacket(self, commPairs, edgeCombineEnabled):
+    def getSumOfHopsPerPacket(self, commPairs, edgeCombineEnabled, dataSize=fl_const.DEFAULT_PACKET_SIZE):
         if edgeCombineEnabled:
             commPairs = self.combineCommPairs(commPairs)
         
-        numPackets = self.modelSize / PACKET_SIZE
+        numPackets = dataSize / fl_const.DEFAULT_PACKET_SIZE
         commPairs = np.array(commPairs)
         sumHPPs = 0
         for commPair in commPairs:
@@ -68,18 +64,34 @@ class AbstractTopology(ABC):
         return sumHPPs
     
     @abstractmethod
-    def createSimNetwork(self, linkSpeed, linkDelay):
+    def createSimNetwork(self, linkSpeedStr, linkDelay):
         pass
+        
+    def getPcapTime(self, filePath):
+        proc = subprocess.Popen(['tcpdump', '-nn', '-tt', '-r', filePath], stdout=subprocess.PIPE)
+        lastLine = None
+        for line in proc.stdout.readlines():
+            if len(line) > 5:
+                lastLine = line
+        if lastLine == None:
+            return -1
+        else:
+            return float(lastLine.split()[0])
     
-    def getDelay(self, commPairs, edgeCombineEnabled, linkSpeed):
-        if edgeCombineEnabled:
-            commPairs = self.combineCommPairs(commPairs)
+    def profileDelay(self, packetSize=fl_const.DEFAULT_PACKET_SIZE, linkSpeed=fl_const.DEFAULT_LINK_SPEED):
+        linkSpeedStr = str(int(linkSpeed)) + 'MBps'
+        
+        commPairs = []
+        for nid1 in range(self.numNodes):
+            for nid2 in range(self.numNodes):
+                if nid1 == nid2: continue
+                commPairs.append((nid1, nid2))
         
         # remove pcap files in advance
-        for f in os.listdir(fl_const.PCAP_DIR_NAME):
-            os.remove(os.path.join(fl_const.PCAP_DIR_NAME, f))
+        for f in os.listdir(fl_const.PCAP_DIR_PATH):
+            os.remove(os.path.join(fl_const.PCAP_DIR_PATH, f))
         
-        (p2p, nodes, xips) = self.createSimNetwork(linkSpeed, LINK_DELAY)
+        (p2p, nodes, xips) = self.createSimNetwork(linkSpeedStr, LINK_DELAY)
         
         # Populate routing table
         ns.internet.Ipv4GlobalRoutingHelper.PopulateRoutingTables()
@@ -92,11 +104,11 @@ class AbstractTopology(ABC):
             dstNid = commPair[1]
             if srcNid == dstNid: continue # 통신이 Loopback 인 경우 통과
             sourceHelper = ns.applications.BulkSendHelper('ns3::TcpSocketFactory', ns.network.InetSocketAddress(xips[dstNid], PORT))
-            sourceHelper.SetAttribute('MaxBytes', ns.core.UintegerValue(SIM_DATA_SIZE))
+            sourceHelper.SetAttribute('MaxBytes', ns.core.UintegerValue(packetSize))
             sourceApps = sourceHelper.Install(nodes.Get(srcNid))
             sourceApps.Start(ns.core.Seconds(0.0))
             sourceApps.Stop(ns.core.Seconds(STOP_TIME))
-            totalBytesSent += SIM_DATA_SIZE
+            totalBytesSent += packetSize
         if totalBytesSent == 0: # 아무것도 보낸 것이 없을 경우 시뮬레이션 Destroy 후 종료
             ns.core.Simulator.Destroy()
             return 0
@@ -110,32 +122,81 @@ class AbstractTopology(ABC):
             sinkAppsList.append(sinkApps)
             
         ascii = ns.network.AsciiTraceHelper()
-        p2p.EnablePcap(os.path.join(fl_const.PCAP_DIR_NAME, 'topology'), nodes, False)
+        p2p.EnablePcap(os.path.join(fl_const.PCAP_DIR_PATH, 'topology'), nodes, False)
+        
+#         print('Total Bytes Sent :', totalBytesSent)
+        ns.core.Simulator.Stop(ns.core.Seconds(STOP_TIME))
+        ns.core.Simulator.Run()
+        ns.core.Simulator.Destroy()
+#         print('Total Bytes Received :', sum( ns.applications.PacketSink(sinkApps.Get(0)).GetTotalRx() for sinkApps in sinkAppsList ))
+        
+        nid2delay = {}
+        c_log_file = open(os.path.join(fl_const.LOG_DIR_PATH, fl_const.C_LOG_FILE_NAME), 'a')
+        with pipes(stdout=c_log_file, stderr=c_log_file):
+            for fileName in os.listdir(fl_const.PCAP_DIR_PATH):
+                nid = int(re.match("topology-(\d+)-1.pcap", fileName).group(1))
+                pcapSec = self.getPcapTime(os.path.join(fl_const.PCAP_DIR_PATH, fileName))
+                if pcapSec == -1: raise Exception
+                nid2delay[nid] = pcapSec
+        c_log_file.close()
+        return nid2delay
+    
+    def getDelay(self, commPairs, edgeCombineEnabled, dataSize=fl_const.DEFAULT_PACKET_SIZE, linkSpeed=fl_const.DEFAULT_LINK_SPEED):
+        linkSpeedStr = str(int(linkSpeed)) + 'MBps'
+        
+        if edgeCombineEnabled:
+            commPairs = self.combineCommPairs(commPairs)
+        
+        # remove pcap files in advance
+        for f in os.listdir(fl_const.PCAP_DIR_PATH):
+            os.remove(os.path.join(fl_const.PCAP_DIR_PATH, f))
+        
+        (p2p, nodes, xips) = self.createSimNetwork(linkSpeedStr, LINK_DELAY)
+        
+        # Populate routing table
+        ns.internet.Ipv4GlobalRoutingHelper.PopulateRoutingTables()
+        
+        totalBytesSent = 0
+        commPairs = np.array(commPairs)
+        
+        for commPair in commPairs:
+            srcNid = commPair[0]
+            dstNid = commPair[1]
+            if srcNid == dstNid: continue # 통신이 Loopback 인 경우 통과
+            sourceHelper = ns.applications.BulkSendHelper('ns3::TcpSocketFactory', ns.network.InetSocketAddress(xips[dstNid], PORT))
+            sourceHelper.SetAttribute('MaxBytes', ns.core.UintegerValue(fl_const.DEFAULT_PACKET_SIZE))
+            sourceApps = sourceHelper.Install(nodes.Get(srcNid))
+            sourceApps.Start(ns.core.Seconds(0.0))
+            sourceApps.Stop(ns.core.Seconds(STOP_TIME))
+            totalBytesSent += fl_const.DEFAULT_PACKET_SIZE
+        if totalBytesSent == 0: # 아무것도 보낸 것이 없을 경우 시뮬레이션 Destroy 후 종료
+            ns.core.Simulator.Destroy()
+            return 0
+        
+        sinkAppsList = []
+        for dstNid in np.unique(commPairs[:,1]):
+            sinkHelper = ns.applications.PacketSinkHelper('ns3::TcpSocketFactory', ns.network.InetSocketAddress(ns.network.Ipv4Address.GetAny(), PORT))
+            sinkApps = sinkHelper.Install(nodes.Get(dstNid))
+            sinkApps.Start(ns.core.Seconds(0.0))
+            sinkApps.Stop(ns.core.Seconds(STOP_TIME))
+            sinkAppsList.append(sinkApps)
+            
+        ascii = ns.network.AsciiTraceHelper()
+        p2p.EnablePcap(os.path.join(fl_const.PCAP_DIR_PATH, 'topology'), nodes, False)
         
 #         print('Total Bytes Sent :', totalBytesSent)
         ns.core.Simulator.Stop(ns.core.Seconds(STOP_TIME))
         ns.core.Simulator.Run()
         ns.core.Simulator.Destroy()
         
-        def getPcapTime(filePath):
-            proc = subprocess.Popen(['tcpdump', '-nn', '-tt', '-r', filePath], stdout=subprocess.PIPE)
-            lastLine = None
-            for line in proc.stdout.readlines():
-                if len(line) > 5:
-                    lastLine = line
-            if lastLine == None:
-                return -1
-            else:
-                return float(lastLine.split()[0])
         def toSec(d):
-            # 10: Network Simulation 을 빨리 하기 위해 1MBps/1000크기(10MBps/10000크기와 유사한 결과)로 했으므로 데이터 크기를 10 더 나눠줌
-            return d / (SIM_DATA_SIZE * 10) * self.modelSize
+            return d / fl_const.DEFAULT_PACKET_SIZE * dataSize
 #         print('Total Bytes Received :', sum( ns.applications.PacketSink(sinkApps.Get(0)).GetTotalRx() for sinkApps in sinkAppsList ))
         
-        c_log_file = open(os.path.join(fl_const.LOG_DIR_NAME, fl_const.C_LOG_FILE_NAME), 'a')
+        c_log_file = open(os.path.join(fl_const.LOG_DIR_PATH, fl_const.C_LOG_FILE_NAME), 'a')
         with pipes(stdout=c_log_file, stderr=c_log_file):
-            maxPcapTime = max( getPcapTime(os.path.join(fl_const.PCAP_DIR_NAME, fileName)) for fileName in os.listdir(fl_const.PCAP_DIR_NAME) )
+            maxPcapTime = max( self.getPcapTime(os.path.join(fl_const.PCAP_DIR_PATH, fileName)) for fileName in os.listdir(fl_const.PCAP_DIR_PATH) )
         c_log_file.close()
-        if maxPcapTime == -1: raise Exception()
+        if maxPcapTime == -1: raise Exception
         maxPcapSec = toSec(maxPcapTime)
         return maxPcapSec

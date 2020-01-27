@@ -48,6 +48,8 @@ python3 main.py --modelName='cnn-femnist' --dataName='femnist' --algName='hier-f
 --nodeType='t' --edgeType='t' --opaque1=1 --opaque2=2
 python3 main.py --modelName='cnn-femnist' --dataName='femnist' --algName='ch-fedavg' \
 --nodeType='t' --opaque1=10 --numGroups=10
+python3 main.py --modelName='cnn-femnist' --dataName='femnist' --algName='ch-fedavg-d' \
+--nodeType='t' --opaque1=10
 ```
 
 ### Version List of Used Python Packages

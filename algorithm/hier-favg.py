@@ -14,11 +14,11 @@ class Algorithm(AbstractAlgorithm):
     def getApprCommCostGlobal(self):
         return self.c.get_hpp_global(False) * 2
     
-    def getCommTimeGroup(self, linkSpeed):
-        return self.c.get_d_group(False, linkSpeed) * 2
+    def getCommTimeGroup(self, c, dataSize, linkSpeed):
+        return c.get_d_group(False, dataSize, linkSpeed) * 2
     
-    def getCommTimeGlobal(self, linkSpeed):
-        return self.c.get_d_global(False, linkSpeed) * 2
+    def getCommTimeGlobal(self, c, dataSize, linkSpeed):
+        return c.get_d_global(False, dataSize, linkSpeed) * 2
         
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'aggrType'])

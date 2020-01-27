@@ -1,11 +1,7 @@
 import numpy as np
 
+import fl_const
 import fl_data
-
-# LINK_SPEED = '10Mbps', SIM_DATA_SIZE = 40000 도 비슷한 결과라서 시뮬레이션 빨리 하기 위해 SIM_DATA_SIZE 를 낮춤
-# 시뮬레이션은 SIM_DATA_SIZE 크기가 클 수록 패킷 수가 늘어나서 오래걸림
-# 자세한 결과는 test-struct.ipynb 참조
-LINK_SPEED = '1MBps'
 
 class Cloud:
     
@@ -42,7 +38,7 @@ class Cloud:
     def clone(self, nid2_g_i__w=None, g__w=None):
         c_cloned = Cloud(self.topology, self.D_byNid, len(self.groups))
         c_cloned.set_p_is(self.get_p_is())
-        c_cloned.digest(self.z, nid2_g_i__w, g__w)
+        c_cloned.digest(self.nids_byGid, nid2_g_i__w, g__w)
         return c_cloned
     
     def invalidate(self):
@@ -75,16 +71,16 @@ class Cloud:
         if self.ready == False: raise Exception
         return list(self.nid2_D_i.values()) # 순서가 중요하지 않을 때 list 반환
     
-    def get_d_global(self, edgeCombineEnabled, linkSpeed=LINK_SPEED):
+    def get_d_global(self, edgeCombineEnabled, dataSize=fl_const.DEFAULT_PACKET_SIZE, linkSpeed=fl_const.DEFAULT_LINK_SPEED):
         if self.ready == False: raise Exception
-        return self.topology.getDelay([ [nid, self.ps_nid] for nid in self.N ], edgeCombineEnabled, linkSpeed)
+        return self.topology.getDelay([ [nid, self.ps_nid] for nid in self.N ], edgeCombineEnabled, dataSize, linkSpeed)
     
-    def get_d_group(self, edgeCombineEnabled, linkSpeed=LINK_SPEED):
+    def get_d_group(self, edgeCombineEnabled, dataSize=fl_const.DEFAULT_PACKET_SIZE, linkSpeed=fl_const.DEFAULT_LINK_SPEED):
         if self.ready == False: raise Exception
         commPairs = []
         for g in self.groups:
             commPairs += [ [nid, g.ps_nid] for nid in g.get_N_k() ]
-        return self.topology.getDelay(commPairs, edgeCombineEnabled, linkSpeed)
+        return self.topology.getDelay(commPairs, edgeCombineEnabled, dataSize, linkSpeed)
     
     def get_hpp_global(self, edgeCombineEnabled):
         if self.ready == False: raise Exception
@@ -92,7 +88,11 @@ class Cloud:
     
     def get_hpp_group(self, edgeCombineEnabled):
         if self.ready == False: raise Exception
-        return max([ self.topology.getSumOfHopsPerPacket([ [nid, g.ps_nid] for nid in g.get_N_k() ], edgeCombineEnabled) for g in self.groups ])
+        return max( self.topology.getSumOfHopsPerPacket([ [nid, g.ps_nid] for nid in g.get_N_k() ], edgeCombineEnabled) for g in self.groups )
+    
+    def get_delay_group(self, nid2delay):
+        if self.ready == False: raise Exception
+        return max( sum( nid2delay[nid] for nid in g.get_N_k() ) for g in self.groups )
     
     def get_delta(self):
         if self.ready == False: raise Exception
@@ -124,18 +124,17 @@ class Cloud:
         EMD = np.average(EMD_ks, weights=self.get_p_ks())
         return EMD
     
-    def digest(self, z, nid2_g_i__w=None, g__w=None):
-        self.z = z
-        # Node Grouping 업데이트
-        nids_byGid = fl_data.to_nids_byGid(z)
+    def digest(self, nids_byGid, nid2_g_i__w=None, g__w=None):
+        # Node Group 정보 업데이트
+        self.nids_byGid = nids_byGid
         if nids_byGid == None:
-            self.ready = False
+            self.invalidate()
             return False
         else:
             for k, N_k in enumerate(nids_byGid):
                 self.groups[k].set_N_k(N_k)
                 
-            # Digest
+            # Group Digest
             self.N = []
             self.D = 0
             self.p_ks = []

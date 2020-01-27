@@ -1,10 +1,12 @@
 import argparse
+import os
 import numpy as np
-
+import random
 import pickle
 import json
 
 from leaf.models.utils.model_utils import read_dir
+import fl_const
 
 def parseArgs():
     parser = argparse.ArgumentParser()
@@ -101,7 +103,7 @@ def parseArgs():
                     help='topologyName',
                     type=str,
                     choices=['fattree', 'jellyfish'],
-                    default='jellyfish')
+                    default='fattree')
     args = parser.parse_args()
     
     if args.modelName == 'sr':
@@ -140,6 +142,14 @@ def parseArgs():
     elif args.dataName == 'celeba':
         args.lrInitial = 0.001 # LEAF Paper
     return args
+
+def initialize(seed=0):
+    # Initialize C log file
+    open(os.path.join(fl_const.LOG_DIR_PATH, fl_const.C_LOG_FILE_NAME), 'w')
+    
+    # tf.set_random_seed 는 model.abc 에서 Graph 생성 후 수행
+    random.seed(1 + seed)
+    np.random.seed(12 + seed)
 
 def serialize(filePath, obj):
     with open(filePath, 'wb') as handle:

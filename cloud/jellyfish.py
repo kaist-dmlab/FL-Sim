@@ -12,8 +12,8 @@ DEGREE = 1
 
 class Topology(AbstractTopology):
     
-    def __init__(self, modelSize, numNodes, numEdges):
-        super().__init__(modelSize, numNodes, numEdges)
+    def __init__(self, numNodes, numEdges):
+        super().__init__(numNodes, numEdges)
         
         # 2012 Jellyfish: Networking Data Centers Randomly
         # N(k-r)
@@ -47,15 +47,15 @@ class Topology(AbstractTopology):
                     self.dist[nid1] = {}
                 self.dist[nid1][nid2] = len(nx.shortest_path(self.g, nid1, nid2)) - 1
                 
-    def createSimNetwork(self, linkSpeed, linkDelay):
-        edges = ns.network.NodeContainer()
-        edges.Create(self.numEdges)
+    def createSimNetwork(self, linkSpeedStr, linkDelay):
         nodes = ns.network.NodeContainer()
         nodes.Create(self.numNodes)
+        edges = ns.network.NodeContainer()
+        edges.Create(self.numEdges)
         
         stack = ns.internet.InternetStackHelper()
-        stack.Install(edges)
         stack.Install(nodes)
+        stack.Install(edges)
         
         def addrEdgeEdge(eid1, eid2):
             return "%d.%d.0.0" % (eid1 + 101, eid2 + 1)
@@ -64,7 +64,7 @@ class Topology(AbstractTopology):
             return "%d.%d.0.0" % (eid + 1, nid + 1)
         
         p2p = ns.point_to_point.PointToPointHelper()
-        p2p.SetDeviceAttribute('DataRate', ns.core.StringValue(linkSpeed))
+        p2p.SetDeviceAttribute('DataRate', ns.core.StringValue(linkSpeedStr))
         p2p.SetChannelAttribute('Delay', ns.core.StringValue(linkDelay))
         
         for (eid1, eid2) in self.eidPairSet:

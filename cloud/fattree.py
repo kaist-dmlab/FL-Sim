@@ -8,8 +8,8 @@ from cloud.topology import AbstractTopology
 
 class Topology(AbstractTopology):
     
-    def __init__(self, modelSize, numNodes, numEdges):
-        super().__init__(modelSize, numNodes, numEdges)
+    def __init__(self, numNodes, numEdges):
+        super().__init__(numNodes, numEdges)
         
         # 실험 상의 Edge 의 개수(numEdges)를 입력받지만, 실험 편의성을 높이기 위해
         # Fat Tree 내에서의 Pod 의 개수(numPods)를 실험 상의 Edge 의 개수(numEdges)로 간주한다.
@@ -57,21 +57,21 @@ class Topology(AbstractTopology):
                     self.dist[nid1] = {}
                 self.dist[nid1][nid2] = len(nx.shortest_path(self.g, nid1, nid2)) - 1
                 
-    def createSimNetwork(self, linkSpeed, linkDelay):
-        cores = ns.network.NodeContainer()
-        cores.Create(self.numCores)
-        aggrs = ns.network.NodeContainer()
-        aggrs.Create(self.numAggrs)
-        edges = ns.network.NodeContainer()
-        edges.Create(self.numFtEdges)
+    def createSimNetwork(self, linkSpeedStr, linkDelay):
         nodes = ns.network.NodeContainer()
         nodes.Create(self.numNodes)
+        edges = ns.network.NodeContainer()
+        edges.Create(self.numFtEdges)
+        aggrs = ns.network.NodeContainer()
+        aggrs.Create(self.numAggrs)
+        cores = ns.network.NodeContainer()
+        cores.Create(self.numCores)
         
         stack = ns.internet.InternetStackHelper()
-        stack.Install(cores)
-        stack.Install(aggrs)
-        stack.Install(edges)
         stack.Install(nodes)
+        stack.Install(edges)
+        stack.Install(aggrs)
+        stack.Install(cores)
         
         def addrCoreAggr(cid, pid, aid):
             return "%d.%d.%d.0" % (cid + 1, pid + 1, aid + 1)
@@ -83,7 +83,7 @@ class Topology(AbstractTopology):
             return "%d.%d.%d.0" % (pid + 201, eid + 1, nid + 1)
         
         p2p = ns.point_to_point.PointToPointHelper()
-        p2p.SetDeviceAttribute('DataRate', ns.core.StringValue(linkSpeed))
+        p2p.SetDeviceAttribute('DataRate', ns.core.StringValue(linkSpeedStr))
         p2p.SetChannelAttribute('Delay', ns.core.StringValue(linkDelay))
         
         for pid in range(self.numPods):
