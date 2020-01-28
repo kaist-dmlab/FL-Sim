@@ -103,7 +103,7 @@ def parseArgs():
                     help='topologyName',
                     type=str,
                     choices=['fattree', 'jellyfish'],
-                    default='fattree')
+                    default='jellyfish')
     args = parser.parse_args()
     
     if args.modelName == 'sr':
@@ -116,22 +116,22 @@ def parseArgs():
         args.sgdEnabled = False
     elif args.modelName == '2nn':
         if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
-        args.maxTime = 1000
+        args.maxTime = 3000
         args.sgdEnabled = False
     elif args.modelName == 'cnn-mnist':
         if not(args.dataName == 'mnist-o'
                or args.dataName == 'mnist-f'
                or args.dataName == 'femnist'): raise Exception(args.modelName, args.dataName)
-        args.maxTime = 2000
+        args.maxTime = 3000
     elif args.modelName == 'cnn-cifar10':
         if args.dataName != 'cifar10': raise Exception(args.modelName, args.dataName)
-        args.maxTime = 2000
+        args.maxTime = 3000
     elif args.modelName == 'cnn-femnist':
         if args.dataName != 'femnist': raise Exception(args.modelName, args.dataName)
-        args.maxTime = 2000
+        args.maxTime = 3000
     elif args.modelName == 'cnn-celeba':
         if args.dataName != 'celeba': raise Exception(args.modelName, args.dataName)
-        args.maxTime = 2000
+        args.maxTime = 3000
     else:
         raise Exception(args.modelName)
         

@@ -3,10 +3,9 @@ from algorithm.abc import AbstractAlgorithm
 class Algorithm(AbstractAlgorithm):
     
     def getFileName(self):
-        tau1 = int(self.args.opaque1)
         tau2 = int(self.args.opaque2)
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + self.args.nodeType + self.args.edgeType + '_' + str(tau1) + '_' + str(tau2)
+                + self.args.nodeType + self.args.edgeType + '_' + str(tau2)
     
     def getApprCommCostGroup(self):
         return self.c.get_hpp_group(False) * 2
@@ -29,6 +28,7 @@ class Algorithm(AbstractAlgorithm):
         tau1 = int(self.args.opaque1)
         tau2 = int(self.args.opaque2)
         t3 = 0 ; time = 0
+        d_local, d_group, d_global = self.getDefaultDelay()
         while True:
             for t2 in range(tau2):
                 w_k_byTime_byGid = []
@@ -42,12 +42,12 @@ class Algorithm(AbstractAlgorithm):
                 w_byTime = self.model.federated_aggregate(w_k_byTime_byGid, self.c.get_p_ks()) # Global Aggregation
                 for t1 in range(tau1):
                     self.epoch = t3*tau1*tau2 + t2*tau1 + t1 + 1
-                    time += self.d_local
+                    time += d_local
                     if self.epoch % tau1 == 0 and not(self.epoch % (tau1*tau2)) == 0:
-                        time += self.d_group
+                        time += d_group
                         aggrType = 'Group'
                     elif self.epoch % (tau1*tau2) == 0:
-                        time += self.d_global
+                        time += d_global
                         aggrType = 'Global'
                     else:
                         aggrType = ''

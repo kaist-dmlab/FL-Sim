@@ -15,8 +15,9 @@ class Algorithm(AbstractAlgorithm):
         w = self.model.getParams()
         
         time = 0
+        d_local, _, _ = self.getDefaultDelay()
         for self.epoch in range(1, self.args.maxEpoch):
-            time += self.d_local
+            time += d_local
             (w_byTime, _) = self.model.federated_train(w, self.trainData_by1Nid, lr, 1, [1])
             w = w_byTime[0]
             (loss, _, _, acc) = self.model.evaluate(w)

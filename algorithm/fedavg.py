@@ -21,14 +21,15 @@ class Algorithm(AbstractAlgorithm):
 
         tau1 = int(self.args.opaque1)
         t2 = 0 ; time = 0
+        d_local, _, d_global = self.getDefaultDelay()
         while True:
             (w_byTime, _) = self.model.federated_train(w, self.c.get_D_is(), lr, tau1, self.c.get_p_is())
             w = w_byTime[-1]
             for t1 in range(tau1):
                 self.epoch = t2*tau1 + t1 + 1
-                time += self.d_local
+                time += d_local
                 if self.epoch % tau1 == 0:
-                    time += self.d_global
+                    time += d_global
                     aggrType = 'Global'
                 else:
                     aggrType = ''

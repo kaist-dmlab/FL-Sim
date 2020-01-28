@@ -73,13 +73,9 @@ class AbstractAlgorithm(ABC):
             print('linkSpeed:', linkSpeed, ', d_group:', d_group, ', d_global:', d_global)
             self.speed2Delay[linkSpeed] = (d_group, d_global)
             
-        # Set Default Delay
-        default_procSpeed = args.procSpeeds[0]
-        default_linkSpeed = args.linkSpeeds[0]
-        self.d_local = self.getFlopOpsPerEpoch() / (default_procSpeed*1e9) # GHz
-        (self.d_group, self.d_global) = self.speed2Delay[default_linkSpeed]
         print('Default Delay...')
-        print('d_local:', self.d_local, ', d_group:', self.d_group, ', d_global:', self.d_global)
+        d_local, d_group, d_global = self.getDefaultDelay()
+        print('d_local:', d_local, ', d_group:', d_group, ', d_global:', d_global)
         print()
     
     @abstractmethod
@@ -93,6 +89,7 @@ class AbstractAlgorithm(ABC):
         print('Dump Json...')
         totalComps = self.epoch * self.getFlopOpsPerEpoch()
         totalComms = self.getTotalComms()
+        d_local, d_group, d_global = self.getDefaultDelay()
         metadata = { 'args': vars(self.args),
                     'modelFlopOps': self.model.flopOps,
                     'modelSize': self.model.size,
@@ -100,9 +97,9 @@ class AbstractAlgorithm(ABC):
                     'numTestSamples': len(self.testData_by1Nid[0]['x']),
                     'totalComps': totalComps,
                     'totalComms': totalComms,
-                    'd_local': self.d_local,
-                    'd_group': self.d_group,
-                    'd_global': self.d_global
+                    'd_local': d_local,
+                    'd_group': d_group,
+                    'd_global': d_global
                    }
         fileNameBase = self.getFileName()
         fl_util.dumpJson(os.path.join(fl_const.LOG_DIR_PATH, fileNameBase + '.json'), metadata)
@@ -121,6 +118,23 @@ class AbstractAlgorithm(ABC):
             for linkSpeed in self.args.linkSpeeds:
                 self.dumpTimeLogs(procSpeed, linkSpeed)
                 
+    def getDefaultDelay(self):
+        default_procSpeed = self.args.procSpeeds[0]
+        default_linkSpeed = self.args.linkSpeeds[0]
+        d_local = self.getFlopOpsPerEpoch() / (default_procSpeed*1e9) # GHz
+        d_group, d_global = self.speed2Delay[default_linkSpeed]
+        return d_local, d_group, d_global
+    
+    def setDefaultCommDelay(self, d_group_new, d_global_new):
+        _, d_group_prev, d_global_prev = self.getDefaultDelay()
+        d_group_ratio = d_group_new / d_group_prev
+        d_global_ratio = d_global_new / d_global_prev
+        
+        # Scale all the previous delays
+        for linkSpeed in self.speed2Delay.keys():
+            d_group, d_global = self.speed2Delay[linkSpeed]
+            self.speed2Delay[linkSpeed] = (d_group*d_group_ratio, d_global*d_global_ratio)
+            
     def getFlopOpsPerEpoch(self):
         # Largest Flop Ops Idea: https://github.com/TalwalkarLab/leaf/blob/master/models/metrics/visualization_utils.py#L263
         lenLargestData = max([ len(self.c.get_nid2_D_i()[nid]['x']) for nid in range(len(self.c.get_N())) ])
@@ -163,7 +177,7 @@ class AbstractAlgorithm(ABC):
     
     def dumpTimeLogs(self, procSpeed, linkSpeed):
         d_local = self.getFlopOpsPerEpoch() / (procSpeed*1e9) # GHz
-        (d_group, d_global) = self.speed2Delay[linkSpeed]
+        d_group, d_global = self.speed2Delay[linkSpeed]
         print('d_local:', d_local, ', d_group:', d_group, ', d_global:', d_global)
         
         # get accuracy in advance
