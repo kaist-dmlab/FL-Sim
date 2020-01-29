@@ -34,7 +34,7 @@ def parseArgs():
                     help='edgeType',
                     type=str,
                     choices=['t', 'q', 'h', 'a'],
-                    default='t')
+                    default='a')
     parser.add_argument('--opaque1',
                     help='opaque1',
                     type=float,
