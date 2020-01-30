@@ -86,7 +86,7 @@ class AbstractAlgorithm(ABC):
         self.fileEpoch.close()
         print()
         
-        print('Dump Json...')
+        print('Dump JSON...')
         totalComps = self.epoch * self.getFlopOpsPerEpoch()
         totalComms = self.getTotalComms()
         d_local, d_group, d_global = self.getDefaultDelay()
@@ -117,6 +117,7 @@ class AbstractAlgorithm(ABC):
         for procSpeed in self.args.procSpeeds:
             for linkSpeed in self.args.linkSpeeds:
                 self.dumpTimeLogs(procSpeed, linkSpeed)
+        print()
                 
     def getDefaultDelay(self):
         default_procSpeed = self.args.procSpeeds[0]
@@ -142,10 +143,10 @@ class AbstractAlgorithm(ABC):
         # Equation for Calculating Flop Ops: https://github.com/TalwalkarLab/leaf/blob/master/models/model.py#L91
         return lenLargestData * self.model.flopOps
     
-    def getApprCommCostGroup(self):
+    def getApprCommCostGroup(self, c):
         return 0
         
-    def getApprCommCostGlobal(self):
+    def getApprCommCostGlobal(self, c):
         return 0
         
     def getCommTimeGroup(self, c, dataSize, linkSpeed):
@@ -173,7 +174,7 @@ class AbstractAlgorithm(ABC):
                 cntGroupComms += 1
             if aggrType == 'Global':
                 cntGlobalComms += 1
-        return cntGroupComms * self.getApprCommCostGroup() + cntGlobalComms * self.getApprCommCostGlobal()
+        return cntGroupComms * self.getApprCommCostGroup(self.c) + cntGlobalComms * self.getApprCommCostGlobal(self.c)
     
     def dumpTimeLogs(self, procSpeed, linkSpeed):
         d_local = self.getFlopOpsPerEpoch() / (procSpeed*1e9) # GHz

@@ -7,8 +7,8 @@ class Algorithm(AbstractAlgorithm):
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
                 + self.args.nodeType + self.args.edgeType + '_' + str(tau1)
     
-    def getApprCommCostGlobal(self):
-        return self.c.get_hpp_global(False) * 2
+    def getApprCommCostGlobal(self, c):
+        return c.get_hpp_global(False) * 2
     
     def getCommTimeGlobal(self, c, dataSize, linkSpeed):
         return c.get_d_global(False, dataSize, linkSpeed) * 2

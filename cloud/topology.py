@@ -24,11 +24,22 @@ class AbstractTopology(ABC):
         self.numEdges = numEdges
         
         self.g = nx.Graph()
-        self.nid2eid = {}
         self.dist = {}
         
     def getDistance(self, nid1, nid2):
         return self.dist[nid1][nid2]
+    
+    @abstractmethod
+    def getEid(self, nid):
+        pass
+    
+    @abstractmethod
+    def getNids(self, eid):
+        pass
+    
+    @abstractmethod
+    def checkIfInSameEdge(self, nid1, nid2):
+        pass
     
     def combineCommPairs(self, commPairs):
         # 현재 통신 Src 중 같은 Edge 에 속하며 같은 Dst 을 가지는 것에 대해 하나만 Src 로 Combine
@@ -37,9 +48,7 @@ class AbstractTopology(ABC):
         for commPair in commPairs:
             srcNid = commPair[0]
             dstNid = commPair[1]
-            srcEid = self.nid2eid[srcNid]
-            dstEid = self.nid2eid[dstNid]
-            if srcEid == dstEid:
+            if self.checkIfInSameEdge(srcNid, dstNid):
                 # Edge 내부 통신일 경우 combine 미적용
                 inEdgeCommPairs.append((srcNid, dstNid))
             else:

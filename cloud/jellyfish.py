@@ -33,13 +33,16 @@ class Topology(AbstractTopology):
                     eidPair = tuple(sorted([eid1, eid2]))
                 self.g.add_edge('e' + str(eidPair[0]), 'e' + str(eidPair[1]))
                 self.eidPairSet.add(eidPair)
-        
+                
+        self.nid2eid = {}
+        self.nids_byEid = { eid:[] for eid in range(numEdges) }
         for eid in range(numEdges):
             for nid_ in range(self.numNodesPerEdge):
                 nid = eid * self.numNodesPerEdge + nid_
                 self.g.add_edge('e' + str(eid), nid)
-                self.nid2eid[nid] = eid # For combineCommPairs()
-        
+                self.nid2eid[nid] = eid
+                self.nids_byEid[eid].append(nid)
+                
         # Initialize hop distance
         for nid1 in range(self.numNodes):
             for nid2 in range(self.numNodes):
@@ -47,6 +50,17 @@ class Topology(AbstractTopology):
                     self.dist[nid1] = {}
                 self.dist[nid1][nid2] = len(nx.shortest_path(self.g, nid1, nid2)) - 1
                 
+    def getEid(self, nid):
+        return self.nid2eid[nid]
+    
+    def getNids(self, eid):
+        return self.nids_byEid[eid]
+    
+    def checkIfInSameEdge(self, nid1, nid2):
+        eid1 = self.nid2eid[nid1]
+        eid2 = self.nid2eid[nid2]
+        return eid1 == eid2
+    
     def createSimNetwork(self, linkSpeedStr, linkDelay):
         nodes = ns.network.NodeContainer()
         nodes.Create(self.numNodes)

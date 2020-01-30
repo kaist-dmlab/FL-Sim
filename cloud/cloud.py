@@ -3,12 +3,15 @@ import numpy as np
 import fl_const
 import fl_data
 
+MAX_STEADY_STEPS = 30 # FIXME: too much
+
 class Cloud:
     
     def __init__(self, topology, D_byNid, numGroups):
         self.topology = topology
         self.D_byNid = D_byNid
-        numTotalClasses = len(np.unique(np.concatenate([D_byNid[nid]['y'] for nid in range(len(D_byNid))])))
+        len_D = sum( len(D_byNid[nid]['x']) for nid in range(len(D_byNid)) )
+        numTotalClasses = len(np.unique(np.concatenate([ D_byNid[nid]['y'] for nid in range(len(D_byNid)) ])))
         cid2_pc = np.zeros(numTotalClasses, dtype=np.int32)
         nid2_cid2_pc_is = {}
         nid2_cid2_numClasses_is = {}
@@ -22,15 +25,12 @@ class Cloud:
             nid2_cid2_pc_is[nid] = cid2_numClasses_i / sum(cid2_numClasses_i)
         cid2_pc = cid2_pc / sum(cid2_pc)
         
-        self.groups = [ Group(k, topology, D_byNid, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is) for k in range(numGroups) ]
-        self.ps_nid = 0 # 모든 노드와의 거리가 같으므로 처음 노드로 설정
+        self.groups = [ Group(k, topology, D_byNid, len_D, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is) for k in range(numGroups) ]
         self.ready = False
     
     def __eq__(self, other):
         if self.groups != other.groups:
             raise Exception(str(self.groups), str(other.groups))
-        if self.ps_nid != other.ps_nid:
-            raise Exception(str(self.ps_nid), str(other.ps_nid))
         if self.ready != other.ready:
             raise Exception(str(self.ready), str(other.ready))
         return True
@@ -86,9 +86,13 @@ class Cloud:
         if self.ready == False: raise Exception
         return self.topology.getSumOfHopsPerPacket([ [nid, self.ps_nid] for nid in self.N ], edgeCombineEnabled)
     
-    def get_hpp_group(self, edgeCombineEnabled):
+    def get_max_hpp_group(self, edgeCombineEnabled):
         if self.ready == False: raise Exception
         return max( self.topology.getSumOfHopsPerPacket([ [nid, g.ps_nid] for nid in g.get_N_k() ], edgeCombineEnabled) for g in self.groups )
+    
+    def get_sum_hpp_group(self, edgeCombineEnabled):
+        if self.ready == False: raise Exception
+        return sum( self.topology.getSumOfHopsPerPacket([ [nid, g.ps_nid] for nid in g.get_N_k() ], edgeCombineEnabled) for g in self.groups )
     
     def get_delay_group(self, nid2delay):
         if self.ready == False: raise Exception
@@ -125,16 +129,14 @@ class Cloud:
         return EMD
     
     def digest(self, nids_byGid, nid2_g_i__w=None, g__w=None):
-        # Node Group 정보 업데이트
-        self.nids_byGid = nids_byGid
         if nids_byGid == None:
-            self.invalidate()
             return False
         else:
+            self.nids_byGid = nids_byGid
             for k, N_k in enumerate(nids_byGid):
                 self.groups[k].set_N_k(N_k)
                 
-            # Group Digest
+            # digest in groups
             self.N = []
             self.D = 0
             self.p_ks = []
@@ -147,20 +149,91 @@ class Cloud:
                 self.p_ks.append(g.get_p_k())
                 self.nid2_p_i.update(g.get_nid2_p_k_i()) # p_is 로 변환
                 self.nid2_D_i.update(g.get_nid2_D_k_i())
+                
+            # determine global parameter server
+            self.ps_nid = self.N[ np.argmin([ sum( self.topology.getDistance(nid1, nid2) for nid2 in self.N ) for nid1 in self.N ]) ]
+            
+            # determine group parameter servers
+            for g in self.groups:
+                g.ps_nid = g.N_k[ np.argmin([ sum( self.topology.getDistance(nid1, nid2) for nid2 in g.N_k ) for nid1 in g.N_k ]) ]
+#             numGroups = len(self.groups)
+#             maxGroupsPerEdge = np.ceil(numGroups / self.topology.numEdges)
+#             cost_star = 1e9
+#             cntSteady = 0
+#             while cntSteady < MAX_STEADY_STEPS:
+#                 eid2Cnt = { eid:0 for eid in range(self.topology.numEdges) }
+#                 cur_ps_nids = []
+#                 cur_ps_eids = []
+#                 cur_cost_ks = []
+                
+#                 # iterate groups in a random order and sample a node for the parameter server
+#                 # such that it minimizes the hop distance cost and maximizes the inter-cluster similarity
+#                 randGids = np.arange(numGroups)
+#                 np.random.shuffle(randGids)
+#                 for k in randGids:
+#                     g = self.groups[k]
+#                     nidAndCostList = []
+#                     for nid1 in g.N_k:
+#                         cost = sum( self.topology.getDistance(nid1, nid2) for nid2 in g.N_k )
+#                         nidAndCostList.append((nid1, cost))
+#                     nidAndCostList.sort(key=lambda x:x[1]) # sort in ascending order of cost
+                    
+#                     # iterate nodes in the group to pick a new parameter server
+#                     cur_ps_nid = None
+#                     for cur_nid, cur_cost in nidAndCostList:
+#                         cur_eid = self.topology.getEid(cur_nid)
+                        
+#                         # check if the current candidate maximizes the inter-cluster similarity
+#                         if eid2Cnt[cur_eid]+1 > maxGroupsPerEdge:
+#                             # if it doesn't, move on to the next candidate
+#                             continue
+#                         else:
+#                             # if it does, pick as a new parameter server
+#                             eid2Cnt[cur_eid] += 1
+#                             cur_ps_nid = cur_nid
+#                             cur_ps_nids.append(cur_nid)
+#                             cur_ps_eids.append(cur_eid)
+#                             cur_cost_ks.append(cur_cost)
+#                             break
+#                     # break if no node satisfied the condition
+#                     if cur_ps_nid == None: break
+                        
+#                 # check for improvement
+#                 cost_cur = 1e9 if len(cur_ps_nids) < numGroups else max(cur_cost_ks)
+#                 if cost_star > cost_cur:
+#                     cost_star = cost_cur
+#                     cntSteady = 0 # 한 번이라도 바뀌면 Steady 카운터 초기화
+                    
+#                     # assign parameter servers
+#                     for idxNormal, idxRand in enumerate(randGids):
+#                         g = self.groups[idxRand]
+#                         g.ps_nid = cur_ps_nids[idxNormal]
+# #                     print('Determining parameter server, cntSteady=%2d, cost_star=%.3f, parameter servers=%s' % \
+# #                           (cntSteady, cost_star, str(sorted(cur_ps_nids))))
+# #                     print()
+#                 else:
+#                     cntSteady += 1
+            
+#             # Check if no candidate found
+#             if cost_star == 1e9: raise Exception(str(MAX_STEADY_STEPS))
+                
+            # Set flag
             self.ready = True
             return True
 
 class Group:
     
-    def __init__(self, k, topology, D_byNid, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is):
+    def __init__(self, k, topology, D_byNid, len_D, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is):
         self.k = k
         self.topology = topology
         self.D_byNid = D_byNid
+        self.len_D = len_D
         self.p_is = None
         self.cid2_pc = cid2_pc
         self.nid2_cid2_pc_is = nid2_cid2_pc_is
         self.nid2_cid2_numClasses_is = nid2_cid2_numClasses_is
         self.N_k = []
+        self.ps_nid = None
         self.ready = False
         
     def __eq__(self, other):
@@ -232,31 +305,32 @@ class Group:
     
     def digest(self, nid2_g_i__w=None, g__w=None):
         if self.ready == True: return # Group 에 변화가 없을 때 연산되는 것을 방지
-        self.p_k = 0
         p_k_is = []
         self.nid2_p_k_i = {}
         self.nid2_D_k_i = {}
+#         if self.p_is == None: # Weight p 미설정 시, 데이터 개수로 가중치
+        len_D_k = sum( len(self.D_byNid[nid]['x']) for nid in self.N_k )
+        self.p_k = len_D_k / self.len_D
         for nid in self.N_k:
             D_k_i = self.D_byNid[nid]
-            if self.p_is == None: # Weight p 미설정 시, 데이터 개수로 가중치
-                p_k_i = len(D_k_i['x'])
-            else:
-                p_k_i = self.p_is[nid]
-            self.p_k += p_k_i
+#             if self.p_is == None: # Weight p 미설정 시, 데이터 개수로 가중치
+            p_k_i = len(D_k_i['x']) / len_D_k
+#             else:
+#                 p_k_i = self.p_is[nid]
+#             self.p_k += p_k_i
             p_k_is.append(p_k_i)
             self.nid2_p_k_i[nid] = p_k_i
             self.nid2_D_k_i[nid] = D_k_i
-        self.ps_nid = self.N_k[ np.argmin([ sum( self.topology.getDistance(nid1, nid2) for nid2 in self.N_k ) for nid1 in self.N_k ]) ]
         
         if nid2_g_i__w != None:
 #             g_k_is__w = [ nid2_g_i__w[nid] for nid in self.N_k ]
-#             g_k__w = np.average(g_k_is__w, axis=0, weights=p_k_is)
-#             delta_k_is = [ np.linalg.norm(nid2_g_i__w[nid] - g_k__w) for nid in self.N_k ]
+#             self.g_k__w = np.average(g_k_is__w, axis=0, weights=p_k_is)
+#             delta_k_is = [ np.linalg.norm(nid2_g_i__w[nid] - self.g_k__w) for nid in self.N_k ]
 #             self.delta_k = np.average(delta_k_is, weights=p_k_is)
 
             g_k_is__w = [ nid2_g_i__w[nid] for nid in self.N_k ]
-            g_k__w = np.average(g_k_is__w, axis=0, weights=p_k_is)
-            self.DELTA_k = np.linalg.norm(g_k__w - g__w)
+            self.g_k__w = np.average(g_k_is__w, axis=0, weights=p_k_is)
+            self.DELTA_k = np.linalg.norm(self.g_k__w - g__w)
             
 #         numTotalClasses = len(self.cid2_pc)
 #         cid2_pc_k = np.zeros(numTotalClasses, dtype=np.int32)

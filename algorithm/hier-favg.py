@@ -7,11 +7,11 @@ class Algorithm(AbstractAlgorithm):
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
                 + self.args.nodeType + self.args.edgeType + '_' + str(tau2)
     
-    def getApprCommCostGroup(self):
-        return self.c.get_hpp_group(False) * 2
+    def getApprCommCostGroup(self, c):
+        return c.get_max_hpp_group(False) * 2
     
-    def getApprCommCostGlobal(self):
-        return self.c.get_hpp_global(False) * 2
+    def getApprCommCostGlobal(self, c):
+        return c.get_hpp_global(False) * 2
     
     def getCommTimeGroup(self, c, dataSize, linkSpeed):
         return c.get_d_group(False, dataSize, linkSpeed) * 2

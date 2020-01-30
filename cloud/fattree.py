@@ -41,6 +41,10 @@ class Topology(AbstractTopology):
                     aid = pid * self.numAggrsPerPod + aid_
                     eid = pid * self.numFtEdgesPerPod + eid_
                     self.g.add_edge('a' + str(aid), 'e' + str(eid))
+        
+        self.nid2FtEid = {}
+        self.nid2eid = {}
+        self.nids_byEid = { eid:[] for eid in range(numEdges) }
                     
         for pid in range(self.numPods):
             for eid_ in range(self.numFtEdgesPerPod):
@@ -48,7 +52,12 @@ class Topology(AbstractTopology):
                     eid = pid * self.numFtEdgesPerPod + eid_
                     nid = pid * self.numNodesPerPod + eid_ * self.numNodesPerEdge + nid_
                     self.g.add_edge('e' + str(eid), nid)
-                    self.nid2eid[nid] = eid # For combineCommPairs()
+                    
+                    # 위에서 언급한 Pod 와 Edge 의 관계 때문에
+                    # FtEid 는 eid 대입, eid 에는 pid 대입
+                    self.nid2FtEid[nid] = eid
+                    self.nid2eid[nid] = pid
+                    self.nids_byEid[pid].append(nid)
                     
         # Initialize hop distance
         for nid1 in range(self.numNodes):
@@ -57,6 +66,17 @@ class Topology(AbstractTopology):
                     self.dist[nid1] = {}
                 self.dist[nid1][nid2] = len(nx.shortest_path(self.g, nid1, nid2)) - 1
                 
+    def getEid(self, nid):
+        return self.nid2eid[nid]
+    
+    def getNids(self, eid):
+        return self.nids_byEid[eid]
+    
+    def checkIfInSameEdge(self, nid1, nid2):
+        eid1 = self.nid2FtEid[nid1]
+        eid2 = self.nid2FtEid[nid2]
+        return eid1 == eid2
+    
     def createSimNetwork(self, linkSpeedStr, linkDelay):
         nodes = ns.network.NodeContainer()
         nodes.Create(self.numNodes)

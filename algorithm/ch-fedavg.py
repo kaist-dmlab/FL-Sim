@@ -1,7 +1,6 @@
 import numpy as np
 import os
 import csv
-import random
 from time import gmtime, strftime
 
 from algorithm.abc import AbstractAlgorithm
@@ -26,11 +25,11 @@ class Algorithm(AbstractAlgorithm):
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
                 + self.args.nodeType + self.args.edgeType + '_' + str(tau2) + '_' + str(self.args.numGroups)
     
-    def getApprCommCostGroup(self):
-        return self.c.get_hpp_group(False) * 2
+    def getApprCommCostGroup(self, c):
+        return c.get_max_hpp_group(False) * 2
     
-    def getApprCommCostGlobal(self):
-        return self.c.get_hpp_global(False) * 2
+    def getApprCommCostGlobal(self, c):
+        return c.get_hpp_global(False) * 2
     
     def getCommTimeGroup(self, c, dataSize, linkSpeed):
         return c.get_d_group(False, dataSize, linkSpeed) * 2
@@ -40,11 +39,6 @@ class Algorithm(AbstractAlgorithm):
     
     def __init__(self, args):
         super().__init__(args)
-        
-        self.c = Cloud(self.c.topology, self.c.D_byNid, args.numGroups)
-        z_rand = fl_data.groupRandomly(args.numNodes, args.numGroups)
-        nids_byGid = fl_data.to_nids_byGid(z_rand)
-        self.c.digest(nids_byGid)
         
         fileName = self.getFileName()
         self.fileCost = open(os.path.join(fl_const.LOG_DIR_PATH, fileName + '_' + COST_CSV_POSTFIX), 'w', newline='', buffering=1)
@@ -145,13 +139,13 @@ class Algorithm(AbstractAlgorithm):
             curIdx = cntIdx % len(c.get_N())
             cntIdx += 1
             (c_star, delta_star, cntSteady, cntPrint) = self.improveWeightOnIdx(c, c_star, delta_star, nid2_g_i__w, g__w, curIdx, cntSteady, cntPrint, mode)
-#             randIdx = random.randint(0, len(c.get_N())-1)
+#             randIdx = np.random.randint(len(c.get_N()))
 #             (c_star, delta_star, cntSteady, cntPrint) = self.improveWeightOnIdx(c, c_star, delta_star, nid2_g_i__w, g__w, randIdx, cntSteady, cntPrint, mode)
 
 #         # Tweak weights
 #         p_is = c.get_p_is()
 #         for i in range(len(p_is)):
-#             if random.choice([True, False]) == True:
+#             if np.random.choice([True, False]) == True:
 #                 p_is[i] += WEIGHTING_WEIGHT_DIFF
 #             else:
 #                 if p_is[i] > WEIGHTING_WEIGHT_DIFF:
@@ -231,10 +225,15 @@ class Algorithm(AbstractAlgorithm):
                 cntSteady += 1
         return (c_star, delta_star, cntSteady, cntPrint)
     
-    def runGrouping(self, c, nid2_g_i__w, g__w):
+    def runGrouping(self, c_edge, nid2_g_i__w, g__w):
         print('IID Grouping Started')
         
-        (c_star, cost_star) = self.runGroupingInternal(c, nid2_g_i__w, g__w)
+        c = Cloud(c_edge.topology, c_edge.D_byNid, self.args.numGroups)
+        z_rand = fl_data.groupRandomly(self.args.numNodes, self.args.numGroups)
+        nids_byGid = fl_data.to_nids_byGid(z_rand)
+        c.digest(nids_byGid, nid2_g_i__w, g__w)
+        
+        c_star, cost_star = self.runKMedoidsGrouping(c, nid2_g_i__w, g__w)
         
         default_linkSpeed = self.args.linkSpeeds[0]
         d_group = self.getCommTimeGroup(c_star, self.model.size, default_linkSpeed)
@@ -247,70 +246,44 @@ class Algorithm(AbstractAlgorithm):
         print('IID Grouping Finished')
         return c_star
     
-    def isGreaterThan(self, lhs, rhs):
-        return (lhs - rhs) > (GROUPING_ERROR_THRESHOLD * rhs)
-    
-#     def associate(self, c, nid2_g_i__w, g__w, medoidNids):
-#         medoidNids_byGid = [ [nid] for nid in medoidNids ]
-#         if c.digest(medoidNids_byGid, nid2_g_i__w, g__w) == False: raise Exception(str(medoidNids_byGid))
-            
-#         z = fl_data.to_z(self.args.numNodes, c.nids_byGid)
-#         for nid in range(self.args.numNodes):
-#             # Medoid 일 경우 무시
-#             if nid in medoidNids: continue
-                
-#             cost_min = 1e9
-#             k_min = None
-#             for k, g in enumerate(c.groups):
-#                 # 목적지 그룹이 이전 그룹과 같을 경우 무시
-#                 if z[nid] == k: continue
-                    
-#                 # 그룹 멤버쉽 변경 시도
-#                 z[nid] = k
-                
-#                 # Cloud Digest 시도
-#                 nids_byGid = fl_data.to_nids_byGid(z)
-#                 if c.digest(nids_byGid, nid2_g_i__w, g__w) == False: raise Exception(str(z), str(nids_byGid))
-                
-#                 # 다음 후보에 대한 Cost 계산
-#                 cost_next = self.getCost(c)
-#                 if cost_min > cost_next:
-#                     # 유리할 경우 변경
-#                     cost_min = cost_next
-#                     k_min = k
-#             z[nid] = k_min
-# #             print('associate nid: %3d\tcurrent cost: %.3f' % (nid, cost_min))
-            
-#         # 마지막 멤버십 초기화가 발생했을 수도 있으므로, Cloud Digest 시도
-#         nids_byGid = fl_data.to_nids_byGid(z)
-#         if c.digest(nids_byGid, nid2_g_i__w, g__w) == False: raise Exception(str(z), str(nids_byGid))
-#         return c, cost_min
-    
-    def runGroupingInternal(self, c, nid2_g_i__w, g__w):
-        # 최적 초기화
-        c_star = c.clone(nid2_g_i__w, g__w)
-        cost_star = self.getCost(c_star)
-        print('Initial cost_star=%.3f' % (cost_star))
-        self.fwCost.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), 0, cost_star, cost_star])
+    def runKMedoidsGrouping(self, c, nid2_g_i__w, g__w):
+        # k-Medoids with Voronoi Iteration
+        # https://en.wikipedia.org/wiki/K-medoids
         
         # Initialize Medoids
-#         medoidNids = np.arange(self.args.numNodes)
-#         np.random.shuffle(medoidNids)
-#         medoidNids = medoidNids[:len(c.groups)]
-#         print('medoidNids:', medoidNids)
+        medoidNids = []
+        cntEid = 0
+        for gid in range(self.args.numGroups):
+            nidsInEdge = c.topology.getNids(cntEid % self.args.numEdges)
+            while True:
+                randNid = np.random.choice(nidsInEdge)
+                if randNid in medoidNids:
+                    continue
+                else:
+                    medoidNids.append(randNid)
+                    break
+            cntEid += 1
+        print('Initial medoidNids:', sorted(medoidNids))
         
         # Associate
-#         c_star, cost_star = self.associate(c, nid2_g_i__w, g__w, medoidNids)
-#         print('Initial cost_star=%.3f' % (cost_star))
-#         self.fwCost.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), 0, cost_star, cost_star])
+        c_cur, cost_cur = self.associate(c, nid2_g_i__w, g__w, medoidNids)
+        c_star, cost_star = c_cur, cost_cur
+        print('Initial cost_star=%.3f' % (cost_star))
+        self.fwCost.writerow([strftime("%m-%d_%H:%M:%S", gmtime()), 0, cost_star, cost_star])
         
         # Iterate
         cntSteady = 0
         while cntSteady < GROUPING_MAX_STEADY_STEPS:
             cost_prev = cost_star
-            cost_cur = self.iterateKMedoidsGrouping(c, nid2_g_i__w, g__w)
+            
+            # Determine medoids
+            medoidNids = self.determineMedoidNids(c_cur, nid2_g_i__w, g__w)
+            print('medoidNids:', sorted(medoidNids))
+            
+            # Associate nodes to medoids
+            c_cur, cost_cur = self.associate(c_cur, nid2_g_i__w, g__w, medoidNids)
             if self.isGreaterThan(cost_star, cost_cur):
-                c_star, cost_star = c.clone(nid2_g_i__w, g__w), cost_cur
+                c_star, cost_star = c_cur, cost_cur
                 cntSteady = 0 # 한 번이라도 바뀌면 Steady 카운터 초기화
             else:
                 cntSteady += 1
@@ -319,89 +292,36 @@ class Algorithm(AbstractAlgorithm):
             print('cntSteady=%d, cost_prev=%.3f, cost_new=%.3f' % (cntSteady, cost_prev, cost_new))
         return c_star, cost_star
     
-    def getCost(self, c):
-#         return c.get_hpp_group(False)
-        return c.get_DELTA()
-
-    def getMedoidNid(self, g, nid2_g_i__w, g__w):
-        return g.ps_nid
-#         N_k = g.get_N_k()
-#         return N_k[ np.argmin([ np.linalg.norm(nid2_g_i__w[nid] - g__w) for nid in N_k ]) ]
+    def isGreaterThan(self, lhs, rhs):
+        return (lhs - rhs) > (GROUPING_ERROR_THRESHOLD * rhs)
     
-    def iterateKMedoidsGrouping(self, c, nid2_g_i__w, g__w):
-        # Voronoi Iteration Style
-        # https://en.wikipedia.org/wiki/K-medoids
-        
-        # Determine Medoid
-#         z = [ None for _ in range(self.args.numNodes) ]
-#         for k, g in enumerate(c.groups):
-#             z[self.getMedoidNid(g, nid2_g_i__w, g__w)] = k
-#         nids_byGid = fl_data.to_nids_byGid(z)
-#         if c.digest(nids_byGid, nid2_g_i__w, g__w) == False: raise Exception(str(z), str(nids_byGid))
-#         medoidNids = np.array(nids_byGid).flatten()
-#         print('medoidNids:', medoidNids)
-        
-#         # Iteration 마다 탐색 인덱스 셔플
-#         nids = np.arange(self.args.numNodes)
-#         np.random.shuffle(nids)
-        
-#         # E Step
-# #         z = fl_data.to_z(self.args.numNodes, c.nids_byGid)
-#         for i in nids:
-#             # Medoid 일 경우 무시
-#             if i in medoidNids: continue
-                
-#             cost_min = 1e9
-#             k_min = None
-#             for k, g in enumerate(c.groups):
-#                 # 목적지 그룹이 이전 그룹과 같을 경우 무시
-#                 if z[i] == k: continue
-                    
-#                 # 그룹 멤버쉽 변경 시도
-#                 z[i] = k
-                
-#                 # Cloud Digest 시도
-#                 nids_byGid = fl_data.to_nids_byGid(z)
-#                 if c.digest(nids_byGid, nid2_g_i__w, g__w) == False: raise Exception(str(z), str(nids_byGid))
-                
-#                 # 다음 후보에 대한 Cost 계산
-#                 cost_next = self.getCost(c)
-#                 if cost_min > cost_next:
-#                     # 유리할 경우 변경
-#                     cost_min = cost_next
-#                     k_min = k
-#             z[i] = k_min
-#             print('nid: %3d\tcurrent cost: %.3f' % (i, cost_min))
+    def associate(self, c, nid2_g_i__w, g__w, medoidNids):
+        c = c.clone(nid2_g_i__w, g__w)
+        medoidNids_byGid = [ [nid] for nid in medoidNids ]
+        if c.digest(medoidNids_byGid, nid2_g_i__w, g__w) == False: raise Exception(str(medoidNids_byGid))
             
-#         # 마지막 멤버십 초기화가 발생했을 수도 있으므로, Cloud Digest 시도
-#         nids_byGid = fl_data.to_nids_byGid(z)
-#         if c.digest(nids_byGid, nid2_g_i__w, g__w) == False: raise Exception(str(z), str(nids_byGid))
-#         return cost_min
-
-        # M Step: medoid 추출과정과 M Step 이 같기 때문에, M Step 먼저 수행
-        z = [ None for _ in range(self.args.numNodes) ]
-        for k, g in enumerate(c.groups):
-            z[self.getMedoidNid(g, nid2_g_i__w, g__w)] = k
-        nids_byGid = fl_data.to_nids_byGid(z)
-        if c.digest(nids_byGid, nid2_g_i__w, g__w) == False: raise Exception(str(z), str(nids_byGid))
-        medoidNids = np.array(nids_byGid).flatten()
-        print('medoidNids:', medoidNids)
+        # Penalty threshold
+        maxNodesPerGroup = np.ceil(self.args.numNodes / len(c.groups)) * 1.5
+        print(maxNodesPerGroup)
         
-        # Iteration 마다 탐색 인덱스 셔플
-        idx_Nid = np.arange(self.args.numNodes)
-        np.random.shuffle(idx_Nid)
+        # Shuffle index every iteration
+        randNids = np.arange(self.args.numNodes)
+        np.random.shuffle(randNids)
         
-        # E Step
-#         z = fl_data.to_z(self.args.numNodes, c.nids_byGid)
-        for i in idx_Nid:
-            # medoid 를 다른 곳으로 옮기려 할 경우 무시
+        z = fl_data.to_z(self.args.numNodes, c.nids_byGid)
+        for i in randNids:
+            # Medoid 일 경우 무시
             if i in medoidNids: continue
                 
-            cost_min = 1e9
-            k_min = None
+            # Search for candidates with the same minimum cost
+            costs = []
             for k, g in enumerate(c.groups):
                 # 목적지 그룹이 이전 그룹과 같을 경우 무시
                 if z[i] == k: continue
+                    
+#                 if len(g.get_N_k())+1 > maxNodesPerGroup:
+#                     costs.append(1e9)
+#                     continue
                     
                 # 그룹 멤버쉽 변경 시도
                 z[i] = k
@@ -409,64 +329,85 @@ class Algorithm(AbstractAlgorithm):
                 # Cloud Digest 시도
                 nids_byGid = fl_data.to_nids_byGid(z)
                 if c.digest(nids_byGid, nid2_g_i__w, g__w) == False: raise Exception(str(z), str(nids_byGid))
-                
+                    
                 # 다음 후보에 대한 Cost 계산
-                cost_next = self.getCost(c)
-                if cost_min > cost_next:
-                    # 유리할 경우 변경
-                    cost_min = cost_next
-                    k_min = k
-            z[i] = k_min
+                cost_next = self.getAssociateCost(c)
+                costs.append(cost_next)
+            costs = np.array(costs)
+            min_ks = np.where(costs == costs.min())[0]
+            min_k = np.random.choice(min_ks)
+            z[i] = min_k # 다음 Iteration 에서 Digest
+            cost_min = costs[min_k]
             print('nid: %3d\tcurrent cost: %.3f' % (i, cost_min))
             
         # 마지막 멤버십 초기화가 발생했을 수도 있으므로, Cloud Digest 시도
         nids_byGid = fl_data.to_nids_byGid(z)
         if c.digest(nids_byGid, nid2_g_i__w, g__w) == False: raise Exception(str(z), str(nids_byGid))
-        return cost_min
+            
+        for k, g in enumerate(c.groups):
+            p_k = c.get_p_ks()[k]
+            print(g.ps_nid, g.get_N_k(), p_k*g.get_DELTA_k())
+        print(c.get_DELTA())
+        return c, cost_min
+    
+    def getAssociateCost(self, c):
+        return c.get_sum_hpp_group(False)
+#         return c.get_DELTA()
 
-#     def iterateKMedoidsGrouping(self, c, nid2_g_i__w, g__w, medoidNids):
-#         # PAM Style
-#         cost_cur = self.getCost(c)
+    def determineMedoidNids(self, c, nid2_g_i__w, g__w):
+        return [ g.ps_nid for g in c.groups ]
+#         medoidNids = []
+#         for g in c.groups:
+#             N_k = g.get_N_k()
+#             costs = []
+#             for nid in N_k:
+#                 p_i = c.get_p_is()[nid]
+#                 iid_i = np.linalg.norm(nid2_g_i__w[nid] - g.g_k__w)
+#                 costs.append(p_i * iid_i)
+#             medoidNids.append(N_k[ np.argmin(costs) ])
+#         return medoidNids
+    
+#     def iterateGreedyPairGrouping(self, c, nid2_g_i__w, g__w, medoidNids):
+#         c = c.clone(nid2_g_i__w, g__w)
+#         cost_cur = self.getAssociateCost(c)
         
 #         # Iteration 마다 탐색 인덱스 셔플
-#         nids = np.arange(self.args.numNodes)
-#         np.random.shuffle(nids)
+#         idx_Nid1 = np.arange(self.args.numNodes)
+#         np.random.shuffle(idx_Nid1)
+#         idx_Nid1 = idx_Nid1[:25]
+        
+#         idx_Nid2 = np.arange(self.args.numNodes)
+#         np.random.shuffle(idx_Nid2)
+#         idx_Nid2 = idx_Nid2[:25]
         
 #         z = fl_data.to_z(self.args.numNodes, c.nids_byGid)
-#         for nid in nids:
-#             # Medoid 일 경우 무시
-#             if nid in medoidNids: continue
-                
-#             for idxMedoid, medoidNid in enumerate(medoidNids):
+#         for i in idx_Nid1:
+#             for j in idx_Nid2:
 #                 # 목적지 그룹이 이전 그룹과 같을 경우 무시
-# #                 if z[nid] == z[medoidNid]: continue
+#                 if z[i] == z[j]: continue
                     
 #                 # 그룹 멤버쉽 변경 시도
-#                 temp_k = z[nid]
-#                 z[nid] = z[medoidNid]
-#                 z[medoidNid] = temp_k
-#                 temp_nid = medoidNid
-#                 medoidNids[idxMedoid] = nid
+#                 temp_k = z[i]
+#                 z[i] = z[j]
+#                 z[j] = temp_k
                 
 #                 # Cloud Digest 시도
 #                 nids_byGid = fl_data.to_nids_byGid(z)
 #                 if c.digest(nids_byGid, nid2_g_i__w, g__w) == False: raise Exception(str(z), str(nids_byGid))
                     
 #                 # 다음 후보에 대한 Cost 계산
-#                 cost_next = self.getCost(c)
+#                 cost_next = self.getAssociateCost(c)
 #                 if cost_cur > cost_next:
 #                     # 유리할 경우 변경
 #                     cost_cur = cost_next
 #                 else:
 #                     # 유리하지 않을 경우, 다시 원래대로 그룹 멤버쉽 초기화 (다음 Iteration 에서 Digest)
-#                     temp_k = z[nid]
-#                     z[nid] = z[medoidNid]
-#                     z[medoidNid] = temp_k
-#                     medoidNids[idxMedoid] = temp_nid
-#             print(medoidNids)
-#             print('nid: %3d\tcurrent cost: %.3f' % (nid, cost_cur))
+#                     temp_k = z[i]
+#                     z[i] = z[j]
+#                     z[j] = temp_k
+#             print('iid nid: %3d\tcurrent cost: %.3f' % (i, cost_cur))
             
 #         # 마지막 멤버십 초기화가 발생했을 수도 있으므로, Cloud Digest 시도
 #         nids_byGid = fl_data.to_nids_byGid(z)
 #         if c.digest(nids_byGid, nid2_g_i__w, g__w) == False: raise Exception(str(z), str(nids_byGid))
-#         return cost_cur
+#         return c, cost_cur
