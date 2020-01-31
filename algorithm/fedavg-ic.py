@@ -2,34 +2,33 @@ import importlib
 import numpy as np
 
 from cloud.cloud import Cloud
-import fl_const
 import fl_data
 
-ChFedavgPackagePath = 'algorithm.ch-fedavg'
-ChFedavgModule = importlib.import_module(ChFedavgPackagePath)
-ChFedavgAlgorithm = getattr(ChFedavgModule, 'Algorithm')
+FedavgIcBasePackagePath = 'algorithm.fedavg-ic-base'
+FedavgIcBaseModule = importlib.import_module(FedavgIcBasePackagePath)
+FedavgIcBaseAlgorithm = getattr(FedavgIcBaseModule, 'Algorithm')
 
 GROUPING_MAX_STEADY_STEPS = 1
 
 NUM_NORM_CONST_SAMPLES = 50
 
-def removeOutliers(x, outlierConstant=1.5):
-    a = np.array(x)
-    upper_quartile = np.percentile(a, 75)
-    lower_quartile = np.percentile(a, 25)
-    IQR = (upper_quartile - lower_quartile) * outlierConstant
-    quartileSet = (lower_quartile - IQR, upper_quartile + IQR)
-    resultList = []
-    for y in a.tolist():
-        if y >= quartileSet[0] and y <= quartileSet[1]:
-            resultList.append(y)
-    return resultList
+# def removeOutliers(x, outlierConstant=1.5):
+#     a = np.array(x)
+#     upper_quartile = np.percentile(a, 75)
+#     lower_quartile = np.percentile(a, 25)
+#     IQR = (upper_quartile - lower_quartile) * outlierConstant
+#     quartileSet = (lower_quartile - IQR, upper_quartile + IQR)
+#     resultList = []
+#     for y in a.tolist():
+#         if y >= quartileSet[0] and y <= quartileSet[1]:
+#             resultList.append(y)
+#     return resultList
 
-class Algorithm(ChFedavgAlgorithm):
+class Algorithm(FedavgIcBaseAlgorithm):
     
-    def __init__(self, args):
-        super().__init__(args)
-        default_linkSpeed = args.linkSpeeds[0]
+#     def __init__(self, args):
+#         super().__init__(args)
+#         default_linkSpeed = args.linkSpeeds[0]
 #         self.nid2delay = self.c.topology.profileDelay(1024, default_linkSpeed)
 #         print('Group Delay', self.c.get_delay_group(self.nid2delay))
         
@@ -60,7 +59,7 @@ class Algorithm(ChFedavgAlgorithm):
                 c_sample.digest(nids_byGid, nid2_g_i__w, g__w)
                 
                 iid_costs.append(c_sample.get_DELTA())
-                comm_costs.append(c_sample.get_sum_hpp_group(False))
+                comm_costs.append(c_sample.get_sum_hpp_group(self.args.edgeCombineEnabled))
                 
                 for g in c_sample.groups:
                     N_k = g.get_N_k()
@@ -90,7 +89,7 @@ class Algorithm(ChFedavgAlgorithm):
         
         print('Final cost_star=%.3f, numGroups=%d, d_group=%.3f, d_global=%.3f' % \
               (cost_star, len(c_star.groups), d_group, d_global))
-        print(c_star.get_DELTA()/self.norm_const_iid, c_star.get_sum_hpp_group(False)/self.norm_const_comm)
+        print(c_star.get_DELTA()/self.norm_const_iid, c_star.get_sum_hpp_group(self.args.edgeCombineEnabled)/self.norm_const_comm)
         
         print('Comm-IID Grouping Finished')
         return c_star
@@ -98,7 +97,7 @@ class Algorithm(ChFedavgAlgorithm):
     def getAssociateCost(self, c):
         if self.norm_const_comm == 0 or self.norm_const_iid == 0:
             raise Exception(str(self.norm_const_iid), str(self.norm_const_comm))
-        return c.get_DELTA()/self.norm_const_iid + 4*c.get_sum_hpp_group(False)/self.norm_const_comm
+        return c.get_DELTA()/self.norm_const_iid + c.get_sum_hpp_group(self.args.edgeCombineEnabled)/self.norm_const_comm
     
     def determineMedoidNids(self, c, nid2_g_i__w, g__w):
         medoidNids = []
@@ -106,9 +105,9 @@ class Algorithm(ChFedavgAlgorithm):
             N_k = g.get_N_k()
             costs = []
             for nid1 in N_k:
-                p_i = c.get_p_is()[nid]
+                p_i = c.get_p_is()[nid1]
                 iid_i = np.linalg.norm(nid2_g_i__w[nid1] - g__w)
                 comm_i = sum( c.topology.getDistance(nid1, nid2) for nid2 in g.N_k )
-                costs.append( p_i*iid_i/self.norm_const_k_iid + 4*comm_i/self.norm_const_k_comm )
+                costs.append( p_i*iid_i/self.norm_const_k_iid + comm_i/self.norm_const_k_comm )
             medoidNids.append(N_k[ np.argmin(costs) ])
         return medoidNids

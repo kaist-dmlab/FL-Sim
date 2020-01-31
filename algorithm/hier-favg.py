@@ -3,22 +3,23 @@ from algorithm.abc import AbstractAlgorithm
 class Algorithm(AbstractAlgorithm):
     
     def getFileName(self):
+        tau1 = int(self.args.opaque1)
         tau2 = int(self.args.opaque2)
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + self.args.nodeType + self.args.edgeType + '_' + str(tau2)
+                + self.args.nodeType + self.args.edgeType + '_' + str(tau1) + '_' + str(tau2)
     
     def getApprCommCostGroup(self, c):
-        return c.get_max_hpp_group(False) * 2
+        return c.get_max_hpp_group(self.args.edgeCombineEnabled) * 2
     
     def getApprCommCostGlobal(self, c):
-        return c.get_hpp_global(False) * 2
+        return c.get_hpp_global(self.args.edgeCombineEnabled) * 2
     
     def getCommTimeGroup(self, c, dataSize, linkSpeed):
-        return c.get_d_group(False, dataSize, linkSpeed) * 2
+        return c.get_d_group(self.args.edgeCombineEnabled, dataSize, linkSpeed) * 2
     
     def getCommTimeGlobal(self, c, dataSize, linkSpeed):
-        return c.get_d_global(False, dataSize, linkSpeed) * 2
-        
+        return c.get_d_global(self.args.edgeCombineEnabled, dataSize, linkSpeed) * 2
+    
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'aggrType'])
         
@@ -63,9 +64,3 @@ class Algorithm(AbstractAlgorithm):
             
             w = w_byTime[-1]
             input_w_ks = [ w for _ in self.c.groups ]
-            
-            # 실험 출력용 Delta 계산
-    #        (g_is__w, nid2_g_i__w) = self.model.federated_collect_gradients(w, self.c.get_nid2_D_i())
-    #        g__w = np.average(g_is__w, axis=0, weights=self.c.get_p_is())
-    #        Delta = self.c.get_Delta(nid2_g_i__w, g__w)
-    #        print(Delta)

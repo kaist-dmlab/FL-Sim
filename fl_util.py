@@ -23,18 +23,18 @@ def parseArgs():
     parser.add_argument('--algName',
                     help='algName',
                     type=str,
-                    choices=['cgd', 'fedavg', 'hier-favg', 'ch-fedavg', 'ch-fedavg-d'],
+                    choices=['cgd', 'fedavg', 'hier-favg', 'fedavg-i', 'fedavg-c', 'fedavg-ic'],
                     required=True)
     parser.add_argument('--nodeType',
                     help='nodeType',
                     type=str,
-                    choices=['t', 'q', 'h', 'a'],
+                    choices=['t', 'q', 'h'], # a 제외
                     default='t')
     parser.add_argument('--edgeType',
                     help='edgeType',
                     type=str,
-                    choices=['t', 'q', 'h', 'a'],
-                    default='a')
+                    choices=['t', 'q', 'h'], # a 제외
+                    default='h')
     parser.add_argument('--opaque1',
                     help='opaque1',
                     type=float,
@@ -59,6 +59,10 @@ def parseArgs():
                     help='sgdEnabled',
                     type=bool,
                     default=True)
+    parser.add_argument('--edgeCombineEnabled',
+                    help='edgeCombineEnabled',
+                    type=bool,
+                    default=False)
     parser.add_argument('--maxEpoch',
                     help='maxEpoch',
                     type=int,
@@ -103,7 +107,7 @@ def parseArgs():
                     help='topologyName',
                     type=str,
                     choices=['fattree', 'jellyfish'],
-                    default='jellyfish')
+                    default='fattree')
     args = parser.parse_args()
     
     if args.modelName == 'sr':

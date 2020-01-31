@@ -62,7 +62,7 @@ class AbstractAlgorithm(ABC):
         self.c.digest(nids_byGid)
         # Note that the cloud c is initialized with numEdges instead of numGroups
         # because the concept of groups is not considered by most of algorithms
-        # But, for those algorithms that care about the concept of groups like ch-fedavg,
+        # But, for those algorithms that care about the concept of groups like fedavg-ic,
         # the cloud c needs to be re-initialized with different numGroups
         
         print('Profiling Delays...')
@@ -118,7 +118,7 @@ class AbstractAlgorithm(ABC):
             for linkSpeed in self.args.linkSpeeds:
                 self.dumpTimeLogs(procSpeed, linkSpeed)
         print()
-                
+        
     def getDefaultDelay(self):
         default_procSpeed = self.args.procSpeeds[0]
         default_linkSpeed = self.args.linkSpeeds[0]
@@ -145,16 +145,16 @@ class AbstractAlgorithm(ABC):
     
     def getApprCommCostGroup(self, c):
         return 0
-        
+    
     def getApprCommCostGlobal(self, c):
         return 0
-        
+    
     def getCommTimeGroup(self, c, dataSize, linkSpeed):
         return 0
-        
+    
     def getCommTimeGlobal(self, c, dataSize, linkSpeed):
         return 0
-        
+    
     def getTotalComms(self):
         if self.args.algName == 'cgd': return 0
         

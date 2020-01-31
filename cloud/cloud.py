@@ -10,7 +10,6 @@ class Cloud:
     def __init__(self, topology, D_byNid, numGroups):
         self.topology = topology
         self.D_byNid = D_byNid
-        len_D = sum( len(D_byNid[nid]['x']) for nid in range(len(D_byNid)) )
         numTotalClasses = len(np.unique(np.concatenate([ D_byNid[nid]['y'] for nid in range(len(D_byNid)) ])))
         cid2_pc = np.zeros(numTotalClasses, dtype=np.int32)
         nid2_cid2_pc_is = {}
@@ -25,7 +24,7 @@ class Cloud:
             nid2_cid2_pc_is[nid] = cid2_numClasses_i / sum(cid2_numClasses_i)
         cid2_pc = cid2_pc / sum(cid2_pc)
         
-        self.groups = [ Group(k, topology, D_byNid, len_D, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is) for k in range(numGroups) ]
+        self.groups = [ Group(k, topology, D_byNid, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is) for k in range(numGroups) ]
         self.ready = False
     
     def __eq__(self, other):
@@ -223,11 +222,10 @@ class Cloud:
 
 class Group:
     
-    def __init__(self, k, topology, D_byNid, len_D, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is):
+    def __init__(self, k, topology, D_byNid, cid2_pc, nid2_cid2_pc_is, nid2_cid2_numClasses_is):
         self.k = k
         self.topology = topology
         self.D_byNid = D_byNid
-        self.len_D = len_D
         self.p_is = None
         self.cid2_pc = cid2_pc
         self.nid2_cid2_pc_is = nid2_cid2_pc_is
@@ -305,32 +303,30 @@ class Group:
     
     def digest(self, nid2_g_i__w=None, g__w=None):
         if self.ready == True: return # Group 에 변화가 없을 때 연산되는 것을 방지
+        self.p_k = 0
         p_k_is = []
         self.nid2_p_k_i = {}
         self.nid2_D_k_i = {}
-#         if self.p_is == None: # Weight p 미설정 시, 데이터 개수로 가중치
-        len_D_k = sum( len(self.D_byNid[nid]['x']) for nid in self.N_k )
-        self.p_k = len_D_k / self.len_D
         for nid in self.N_k:
             D_k_i = self.D_byNid[nid]
-#             if self.p_is == None: # Weight p 미설정 시, 데이터 개수로 가중치
-            p_k_i = len(D_k_i['x']) / len_D_k
-#             else:
-#                 p_k_i = self.p_is[nid]
-#             self.p_k += p_k_i
+            if self.p_is == None: # Weight p 미설정 시, 데이터 개수로 가중치
+                p_k_i = len(D_k_i['x'])
+            else:
+                p_k_i = self.p_is[nid]
+            self.p_k += p_k_i
             p_k_is.append(p_k_i)
             self.nid2_p_k_i[nid] = p_k_i
             self.nid2_D_k_i[nid] = D_k_i
         
         if nid2_g_i__w != None:
 #             g_k_is__w = [ nid2_g_i__w[nid] for nid in self.N_k ]
-#             self.g_k__w = np.average(g_k_is__w, axis=0, weights=p_k_is)
-#             delta_k_is = [ np.linalg.norm(nid2_g_i__w[nid] - self.g_k__w) for nid in self.N_k ]
+#             g_k__w = np.average(g_k_is__w, axis=0, weights=p_k_is)
+#             delta_k_is = [ np.linalg.norm(nid2_g_i__w[nid] - g_k__w) for nid in self.N_k ]
 #             self.delta_k = np.average(delta_k_is, weights=p_k_is)
 
             g_k_is__w = [ nid2_g_i__w[nid] for nid in self.N_k ]
-            self.g_k__w = np.average(g_k_is__w, axis=0, weights=p_k_is)
-            self.DELTA_k = np.linalg.norm(self.g_k__w - g__w)
+            g_k__w = np.average(g_k_is__w, axis=0, weights=p_k_is)
+            self.DELTA_k = np.linalg.norm(g_k__w - g__w)
             
 #         numTotalClasses = len(self.cid2_pc)
 #         cid2_pc_k = np.zeros(numTotalClasses, dtype=np.int32)
