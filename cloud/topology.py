@@ -48,6 +48,7 @@ class AbstractTopology(ABC):
         for commPair in commPairs:
             srcNid = commPair[0]
             dstNid = commPair[1]
+            srcEid = self.nid2eid[srcNid]
             if self.checkIfInSameEdge(srcNid, dstNid):
                 # Edge 내부 통신일 경우 combine 미적용
                 inEdgeCommPairs.append((srcNid, dstNid))

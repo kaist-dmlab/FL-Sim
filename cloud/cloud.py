@@ -127,7 +127,7 @@ class Cloud:
         EMD = np.average(EMD_ks, weights=self.get_p_ks())
         return EMD
     
-    def digest(self, nids_byGid, nid2_g_i__w=None, g__w=None):
+    def digest(self, nids_byGid, nid2_g_i__w=None, g__w=None, debugging=False):
         if nids_byGid == None:
             return False
         else:
@@ -142,7 +142,7 @@ class Cloud:
             self.nid2_p_i = {}
             self.nid2_D_i = {}
             for g in self.groups:
-                g.digest(nid2_g_i__w, g__w)
+                g.digest(nid2_g_i__w, g__w, debugging)
                 self.N += g.get_N_k()
                 self.D += g.get_p_k()
                 self.p_ks.append(g.get_p_k())
@@ -301,7 +301,7 @@ class Group:
         if self.ready == False: raise Exception
         return self.EMD_k
     
-    def digest(self, nid2_g_i__w=None, g__w=None):
+    def digest(self, nid2_g_i__w=None, g__w=None, debugging=False):
         if self.ready == True: return # Group 에 변화가 없을 때 연산되는 것을 방지
         self.p_k = 0
         p_k_is = []
@@ -342,4 +342,6 @@ class Group:
 #         cid2_pc_k = cid2_pc_k / sum(cid2_pc_k)
 #         self.EMD_k = self.calcEMD(self.cid2_pc_k, self.cid2_pc)
 
+        if debugging == True:
+            print('digested group ' + str(self.k))
         self.ready = True
