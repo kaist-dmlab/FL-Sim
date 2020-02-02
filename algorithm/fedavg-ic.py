@@ -37,7 +37,7 @@ class Algorithm(FedavgIcBaseAlgorithm):
         
         # 최적 초기화
         c_star = None
-        cost_star = 1e9
+        cost_star = float('inf')
         
         # 그룹 개수 바꿔가면서 탐색
         cntSteady = 0

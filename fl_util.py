@@ -13,7 +13,7 @@ def parseArgs():
     parser.add_argument('--modelName',
                     help='modelName',
                     type=str,
-                    choices=['sr', '1nn', '2nn', 'cnn-mnist', 'cnn-cifar10', 'cnn-femnist', 'cnn-celeba'], # svm, resnet 제외
+                    choices=['sr', '2nn', 'cnn-mnist', 'cnn-celeba'], # 1nn, svm, cnn-femnist, resnet 제외
                     required=True)
     parser.add_argument('--dataName',
                     help='dataName',
@@ -23,7 +23,7 @@ def parseArgs():
     parser.add_argument('--algName',
                     help='algName',
                     type=str,
-                    choices=['cgd', 'fedavg', 'hier-favg', 'fedavg-i', 'fedavg-c', 'fedavg-ic', 'fedavg-ic2', 'fedavg-ss'],
+                    choices=['cgd', 'fedavg', 'hier-favg', 'fedavg-i', 'fedavg-c', 'fedavg-ic'], # fedavg-ic2, fedavg-ss 제외
                     required=True)
     parser.add_argument('--nodeType',
                     help='nodeType',
@@ -112,16 +112,14 @@ def parseArgs():
     
     if args.modelName == 'sr':
         if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
+        args.sgdEnabled = False
         args.maxTime = 100
-        args.sgdEnabled = False
-    elif args.modelName == '1nn':
-        if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
-        args.maxTime = 1000
-        args.sgdEnabled = False
     elif args.modelName == '2nn':
-        if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
-        args.maxTime = 3000
         args.sgdEnabled = False
+        if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
+            args.maxTime = 3000
+        else:
+            raise Exception(args.modelName, args.dataName)
     elif args.modelName == 'cnn-mnist':
         if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
             args.maxTime = 3000
@@ -129,23 +127,17 @@ def parseArgs():
             args.maxTime = 6000
         else:
             raise Exception(args.modelName, args.dataName)
-    elif args.modelName == 'cnn-cifar10':
-        if args.dataName != 'cifar10': raise Exception(args.modelName, args.dataName)
-        args.maxTime = 3000
-    elif args.modelName == 'cnn-femnist':
-        if args.dataName != 'femnist': raise Exception(args.modelName, args.dataName)
-        args.maxTime = 200000
     elif args.modelName == 'cnn-celeba':
         if args.dataName != 'celeba': raise Exception(args.modelName, args.dataName)
         args.maxTime = 1000
     else:
         raise Exception(args.modelName)
         
-    if args.dataName == 'cifar10':
-        args.lrInitial = 0.01
-#     elif args.dataName == 'femnist':
+#     if args.dataName == 'cifar10':
+#         args.lrInitial = 0.01
+#     if args.dataName == 'femnist':
 #         args.lrInitial = 0.06 # LEAF Paper
-    elif args.dataName == 'celeba':
+    if args.dataName == 'celeba':
         args.lrInitial = 0.001 # LEAF Paper
     return args
 

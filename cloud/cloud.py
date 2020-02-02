@@ -158,7 +158,7 @@ class Cloud:
                 g.ps_nid = g.N_k[ np.argmin([ sum( self.topology.getDistance(nid1, nid2) for nid2 in g.N_k ) for nid1 in g.N_k ]) ]
 #             numGroups = len(self.groups)
 #             maxGroupsPerEdge = np.ceil(numGroups / self.topology.numEdges)
-#             cost_star = 1e9
+#             cost_star = float('inf')
 #             cntSteady = 0
 #             while cntSteady < MAX_STEADY_STEPS:
 #                 eid2Cnt = { eid:0 for eid in range(self.topology.numEdges) }
@@ -199,7 +199,7 @@ class Cloud:
 #                     if cur_ps_nid == None: break
                         
 #                 # check for improvement
-#                 cost_cur = 1e9 if len(cur_ps_nids) < numGroups else max(cur_cost_ks)
+#                 cost_cur = float('inf') if len(cur_ps_nids) < numGroups else max(cur_cost_ks)
 #                 if cost_star > cost_cur:
 #                     cost_star = cost_cur
 #                     cntSteady = 0 # 한 번이라도 바뀌면 Steady 카운터 초기화
@@ -215,7 +215,7 @@ class Cloud:
 #                     cntSteady += 1
             
 #             # Check if no candidate found
-#             if cost_star == 1e9: raise Exception(str(MAX_STEADY_STEPS))
+#             if cost_star == float('inf'): raise Exception(str(MAX_STEADY_STEPS))
                 
             # Set flag
             self.ready = True

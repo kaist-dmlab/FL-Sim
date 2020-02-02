@@ -144,7 +144,7 @@ class AbstractTopology(ABC):
         c_log_file = open(os.path.join(fl_const.LOG_DIR_PATH, fl_const.C_LOG_FILE_NAME), 'a')
         with pipes(stdout=c_log_file, stderr=c_log_file):
             for fileName in os.listdir(fl_const.PCAP_DIR_PATH):
-                nid = int(re.match("topology-(\d+)-1.pcap", fileName).group(1))
+                nid = int(re.match('topology-(\d+)-1.pcap', fileName).group(1))
                 pcapSec = self.getPcapTime(os.path.join(fl_const.PCAP_DIR_PATH, fileName))
                 if pcapSec == -1: raise Exception
                 nid2delay[nid] = pcapSec

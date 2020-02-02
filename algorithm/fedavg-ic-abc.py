@@ -14,7 +14,7 @@ COST_CSV_POSTFIX = 'cost.csv'
 WEIGHTING_MAX_STEADY_STEPS = 100
 WEIGHTING_WEIGHT_DIFF = 10
 
-GROUPING_INTERVAL = 10000
+GROUPING_INTERVAL = float('inf')
 GROUPING_MAX_STEADY_STEPS = 1
 GROUPING_ERROR_THRESHOLD = 0.01
 
@@ -101,8 +101,6 @@ class Algorithm(AbstractAlgorithm):
                 # Gradient Estimation
                 (g_is__w, nid2_g_i__w) = self.model.federated_collect_gradients(w, self.c.get_nid2_D_i())
                 g__w = np.average(g_is__w, axis=0, weights=self.c.get_p_is())
-                
-                print([ np.linalg.norm(nid2_g_i__w[nid]) for nid in range(self.args.numNodes) ])
                 
 #                 D_is = self.c.get_D_is()
 #                 p_is = [ len(np.unique(D_i['y'])) for D_i in D_is ]
@@ -241,8 +239,6 @@ class Algorithm(AbstractAlgorithm):
         d_global = self.getCommTimeGlobal(c_star, self.model.size, default_linkSpeed)
         self.setDefaultCommDelay(d_group, d_global)
         
-        print(c_star.ps_nid, len(c_star.get_N()), c_star.get_N())
-        
         print('Final cost_star=%.3f, numGroups=%d, d_group=%.3f, d_global=%.3f' % \
               (cost_star, len(c_star.groups), d_group, d_global))
         
@@ -333,7 +329,6 @@ class Algorithm(AbstractAlgorithm):
             min_k = np.random.choice(min_ks)
             z[i] = min_k # 다음 Iteration 에서 Digest
             cost_min = costs[min_k]
-            print(min_k, costs)
             print('nid: %3d\tcurrent cost: %.3f' % (i, cost_min))
             
         # 마지막 멤버십 초기화가 발생했을 수도 있으므로, Cloud Digest 시도
