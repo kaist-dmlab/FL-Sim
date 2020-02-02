@@ -4,7 +4,7 @@ import numpy as np
 from cloud.cloud import Cloud
 import fl_data
 
-FedavgIcBasePackagePath = 'algorithm.fedavg-ic-base'
+FedavgIcBasePackagePath = 'algorithm.fedavg-ic-abc'
 FedavgIcBaseModule = importlib.import_module(FedavgIcBasePackagePath)
 FedavgIcBaseAlgorithm = getattr(FedavgIcBaseModule, 'Algorithm')
 

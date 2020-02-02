@@ -23,7 +23,7 @@ def parseArgs():
     parser.add_argument('--algName',
                     help='algName',
                     type=str,
-                    choices=['cgd', 'fedavg', 'hier-favg', 'fedavg-i', 'fedavg-c', 'fedavg-ic'],
+                    choices=['cgd', 'fedavg', 'hier-favg', 'fedavg-i', 'fedavg-c', 'fedavg-ic', 'fedavg-ic2', 'fedavg-ss'],
                     required=True)
     parser.add_argument('--nodeType',
                     help='nodeType',
@@ -123,26 +123,28 @@ def parseArgs():
         args.maxTime = 3000
         args.sgdEnabled = False
     elif args.modelName == 'cnn-mnist':
-        if not(args.dataName == 'mnist-o'
-               or args.dataName == 'mnist-f'
-               or args.dataName == 'femnist'): raise Exception(args.modelName, args.dataName)
-        args.maxTime = 3000
+        if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
+            args.maxTime = 3000
+        elif args.dataName == 'femnist':
+            args.maxTime = 6000
+        else:
+            raise Exception(args.modelName, args.dataName)
     elif args.modelName == 'cnn-cifar10':
         if args.dataName != 'cifar10': raise Exception(args.modelName, args.dataName)
         args.maxTime = 3000
     elif args.modelName == 'cnn-femnist':
         if args.dataName != 'femnist': raise Exception(args.modelName, args.dataName)
-        args.maxTime = 3000
+        args.maxTime = 200000
     elif args.modelName == 'cnn-celeba':
         if args.dataName != 'celeba': raise Exception(args.modelName, args.dataName)
-        args.maxTime = 3000
+        args.maxTime = 1000
     else:
         raise Exception(args.modelName)
         
     if args.dataName == 'cifar10':
         args.lrInitial = 0.01
-    elif args.dataName == 'femnist':
-        args.lrInitial = 0.06 # LEAF Paper
+#     elif args.dataName == 'femnist':
+#         args.lrInitial = 0.06 # LEAF Paper
     elif args.dataName == 'celeba':
         args.lrInitial = 0.001 # LEAF Paper
     return args
@@ -165,7 +167,7 @@ def deserialize(filePath):
     
 def dumpJson(filePath, jsonObj):
     with open(filePath, "w") as handle:
-        json.dump(jsonObj, handle)
+        json.dump(jsonObj, handle, indent=2, sort_keys=True)
 
 def loadJson(filePath):
     with open(filePath, 'r') as handle:

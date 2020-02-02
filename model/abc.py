@@ -8,11 +8,8 @@ from leaf.models.utils.tf_utils import graph_size
 def next_batch(batchSize, dataBatch):
     x = dataBatch['x']
     y = dataBatch['y']
-    idx = np.arange(len(x))
-    np.random.shuffle(idx)
-    x_randBatch = [x[i] for i in idx[:batchSize]]
-    y_randBatch = [y[i] for i in idx[:batchSize]]
-    return x_randBatch, y_randBatch
+    idxRand = np.random.choice(np.arange(len(x)), size=batchSize, replace=False)
+    return x[idxRand], y[idxRand]
 
 def np_flatten(model):
     model_ = []
@@ -87,9 +84,6 @@ class AbstractModel(ABC):
     def getOptimizer(self):
         return tf.train.GradientDescentOptimizer(self.lr).minimize(self.loss)
     
-    def augment(self, x):
-        return x
-    
     def local_train(self, dataBatch, lr, tau1):
         with self.graph.as_default():
             w_byTime = []
@@ -97,7 +91,6 @@ class AbstractModel(ABC):
                 for _ in range(tau1):
                     dataBatch_x = dataBatch['x']
                     dataBatch_y = dataBatch['y']
-                    dataBatch_x = self.augment(dataBatch_x)
                     self.sess.run(self.train_op, feed_dict={self.lr: lr, self.x: dataBatch_x, self.y: dataBatch_y})
                     w = self.sess.run(self.w, feed_dict={self.lr: lr, self.x: dataBatch_x, self.y: dataBatch_y})
                     w_byTime.append(w)
@@ -105,11 +98,16 @@ class AbstractModel(ABC):
             else:
                 numEpochSamples = dataBatch['x'].shape[0]
                 numItersPerEpoch = int(np.ceil(numEpochSamples / self.args.batchSize).tolist())
-                for t1 in range(tau1):
+                for _ in range(tau1):
                     for it in range(numItersPerEpoch):
                         (sampleBatch_x, sampleBatch_y) = next_batch(self.args.batchSize, dataBatch)
-                        sampleBatch_x = self.augment(sampleBatch_x)
                         self.sess.run(self.train_op, feed_dict={self.lr: lr, self.x: sampleBatch_x, self.y: sampleBatch_y})
+                        # FIXME: SGD 의 float point precision 문제
+                        # 이 부분을 찍어보면, it == 0 일 때와 it == numItersPerEpoch-1 일 때 점점 w 의 값이 변하는 것을 알 수 있음
+#                         w = self.sess.run(self.w, feed_dict={self.lr: lr, self.x: sampleBatch_x, self.y: sampleBatch_y})
+#                         if it == 0: # it == numItersPerEpoch-1:
+#                             print(sampleBatch_y)
+#                             print(w)
                     # Epoch 마다 정보 저장
                     w = self.sess.run(self.w, feed_dict={self.lr: lr, self.x: sampleBatch_x, self.y: sampleBatch_y})
                     w_byTime.append(w)

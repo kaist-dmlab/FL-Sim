@@ -1,7 +1,7 @@
 import importlib
 
 
-FedavgIcBasePackagePath = 'algorithm.fedavg-ic-base'
+FedavgIcBasePackagePath = 'algorithm.fedavg-ic-abc'
 FedavgIcBaseModule = importlib.import_module(FedavgIcBasePackagePath)
 FedavgIcBaseAlgorithm = getattr(FedavgIcBaseModule, 'Algorithm')
 

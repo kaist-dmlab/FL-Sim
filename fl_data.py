@@ -7,10 +7,10 @@ def sample(data_by1Nid, numSamples):
     return [ { 'x': data_by1Nid[0]['x'][:numSamples], 'y': data_by1Nid[0]['y'][:numSamples] } ]
 
 def to_nids_byGid(z):
-    gids = np.unique([gid for gid in z if isinstance(gid, int)])
+    gids = np.unique([gid for gid in z if isinstance(gid, int)]) # 숫자만 필터링(None 제외) 후 Unique 적용
     for gid in range(len(gids)):
-        if not(gid in gids): return None
-    nids_byGid = [ [ nid for nid, gid in enumerate(z) if gid == gid_ ] for gid_ in gids ]
+        if not(gid in gids): raise Exception(str(gids)) # 모든 Group 이 사용되고 있는 지 검사
+    nids_byGid = [ sorted([ nid for nid, gid in enumerate(z) if gid == gid_ ]) for gid_ in gids ]
     return nids_byGid
 
 def to_z(numNodes, nids_byGid):

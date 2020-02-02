@@ -60,15 +60,15 @@ class Cloud:
     
     def get_p_is(self):
         if self.ready == False: raise Exception
-        return list(self.nid2_p_i.values()) # 순서가 중요하지 않을 때 list 반환
+        return list(self.nid2_p_i.values()) # nid 순으로 정렬된 값 반환
     
     def get_nid2_D_i(self): # 전체 노드 별 데이터 집합
         if self.ready == False: raise Exception
-        return self.nid2_D_i # 순서가 중요할 때 dict 반환
+        return self.nid2_D_i
     
     def get_D_is(self):
         if self.ready == False: raise Exception
-        return list(self.nid2_D_i.values()) # 순서가 중요하지 않을 때 list 반환
+        return list(self.nid2_D_i.values()) # nid 순으로 정렬된 값 반환
     
     def get_d_global(self, edgeCombineEnabled, dataSize=fl_const.DEFAULT_PACKET_SIZE, linkSpeed=fl_const.DEFAULT_LINK_SPEED):
         if self.ready == False: raise Exception
@@ -148,7 +148,8 @@ class Cloud:
                 self.p_ks.append(g.get_p_k())
                 self.nid2_p_i.update(g.get_nid2_p_k_i()) # p_is 로 변환
                 self.nid2_D_i.update(g.get_nid2_D_k_i())
-                
+            self.N = sorted(self.N)
+            
             # determine global parameter server
             self.ps_nid = self.N[ np.argmin([ sum( self.topology.getDistance(nid1, nid2) for nid2 in self.N ) for nid1 in self.N ]) ]
             
@@ -267,19 +268,19 @@ class Group:
     
     def get_nid2_p_k_i(self): # 그룹 노드 별 데이터 크기 집합
         if self.ready == False: raise Exception
-        return self.nid2_p_k_i # 순서가 중요할 때 dict 반환
+        return self.nid2_p_k_i
     
     def get_p_k_is(self):
         if self.ready == False: raise Exception
-        return list(self.nid2_p_k_i.values()) # 순서가 중요하지 않을 때 list 반환
+        return list(self.nid2_p_k_i.values()) # nid 순으로 정렬된 값 반환
     
     def get_nid2_D_k_i(self): # 그룹 노드 별 데이터 집합
         if self.ready == False: raise Exception
-        return self.nid2_D_k_i # 순서가 중요할 때 dict 반환
+        return self.nid2_D_k_i
     
     def get_D_k_is(self):
         if self.ready == False: raise Exception
-        return list(self.nid2_D_k_i.values()) # 순서가 중요하지 않을 때 list 반환
+        return list(self.nid2_D_k_i.values()) # nid 순으로 정렬된 값 반환
     
     def get_delta_k(self):
         if self.ready == False: raise Exception
@@ -323,7 +324,7 @@ class Group:
 #             g_k__w = np.average(g_k_is__w, axis=0, weights=p_k_is)
 #             delta_k_is = [ np.linalg.norm(nid2_g_i__w[nid] - g_k__w) for nid in self.N_k ]
 #             self.delta_k = np.average(delta_k_is, weights=p_k_is)
-
+            
             g_k_is__w = [ nid2_g_i__w[nid] for nid in self.N_k ]
             g_k__w = np.average(g_k_is__w, axis=0, weights=p_k_is)
             self.DELTA_k = np.linalg.norm(g_k__w - g__w)
