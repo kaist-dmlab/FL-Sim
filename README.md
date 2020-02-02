@@ -39,17 +39,15 @@ export PYTHONPATH
 ```
 
 ### Execution
-Please refer to fl_util.py or the paper for the list of possible parameters
+Please refer to fl_util.py for the list of possible parameters
 ```console
 python3 main.py --modelName='cnn-femnist' --dataName='femnist' --algName='cgd'
 python3 main.py --modelName='cnn-femnist' --dataName='femnist' --algName='fedavg' \
---nodeType='t' --opaque1=2
+--nodeType='t' --opaque1=5
 python3 main.py --modelName='cnn-femnist' --dataName='femnist' --algName='hier-favg' \
---nodeType='t' --edgeType='t' --opaque1=1 --opaque2=2
-python3 main.py --modelName='cnn-femnist' --dataName='femnist' --algName='ch-fedavg' \
---nodeType='t' --opaque1=10 --numGroups=10
-python3 main.py --modelName='cnn-femnist' --dataName='femnist' --algName='ch-fedavg-d' \
---nodeType='t' --opaque1=10
+--nodeType='t' --edgeType='t' --opaque1=1 --opaque2=5
+python3 main.py --modelName='cnn-femnist' --dataName='femnist' --algName='fedavg-ic' \
+--nodeType='t' --edgeType='t' --opaque1=1 --opaque2=5
 ```
 
 ### Version List of Used Python Packages
