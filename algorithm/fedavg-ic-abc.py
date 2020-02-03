@@ -27,6 +27,8 @@ class Algorithm(AbstractAlgorithm):
                 + self.args.nodeType + self.args.edgeType + '_' + str(tau1) + '_' + str(tau2) + '_' + str(self.args.numGroups)
     
     def __init__(self, args):
+        super().__init__(args)
+        
         fileName = self.getFileName()
         self.fileCost = open(os.path.join(fl_const.LOG_DIR_PATH, fileName + '_' + COST_CSV_POSTFIX), 'w', newline='', buffering=1)
         self.fwCost = csv.writer(self.fileCost, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
