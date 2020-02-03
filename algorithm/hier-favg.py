@@ -9,16 +9,16 @@ class Algorithm(AbstractAlgorithm):
                 + self.args.nodeType + self.args.edgeType + '_' + str(tau1) + '_' + str(tau2)
     
     def getApprCommCostGroup(self, c):
-        return c.get_max_hpp_group(self.args.edgeCombineEnabled) * 2
+        return c.get_max_hpp_group(False) * 2
     
     def getApprCommCostGlobal(self, c):
-        return c.get_hpp_global(self.args.edgeCombineEnabled) * 2
+        return c.get_hpp_global(False) * 2
     
     def getCommTimeGroup(self, c, dataSize, linkSpeed):
-        return c.get_d_group(self.args.edgeCombineEnabled, dataSize, linkSpeed) * 2
+        return c.get_d_group(False, dataSize, linkSpeed) * 2
     
     def getCommTimeGlobal(self, c, dataSize, linkSpeed):
-        return c.get_d_global(self.args.edgeCombineEnabled, dataSize, linkSpeed) * 2
+        return c.get_d_global(False, dataSize, linkSpeed) * 2
     
     def run(self):
         self.fwEpoch.writerow(['epoch', 'loss', 'accuracy', 'aggrType'])

@@ -15,7 +15,7 @@ WEIGHTING_MAX_STEADY_STEPS = 100
 WEIGHTING_WEIGHT_DIFF = 10
 
 GROUPING_INTERVAL = float('inf')
-GROUPING_MAX_STEADY_STEPS = 1
+GROUPING_MAX_STEADY_STEPS = 5
 GROUPING_ERROR_THRESHOLD = 0.01
 
 class Algorithm(AbstractAlgorithm):
@@ -27,9 +27,6 @@ class Algorithm(AbstractAlgorithm):
                 + self.args.nodeType + self.args.edgeType + '_' + str(tau1) + '_' + str(tau2) + '_' + str(self.args.numGroups)
     
     def __init__(self, args):
-        args.edgeCombineEnabled = False
-        super().__init__(args)
-        
         fileName = self.getFileName()
         self.fileCost = open(os.path.join(fl_const.LOG_DIR_PATH, fileName + '_' + COST_CSV_POSTFIX), 'w', newline='', buffering=1)
         self.fwCost = csv.writer(self.fileCost, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
@@ -39,16 +36,16 @@ class Algorithm(AbstractAlgorithm):
         super().__del__()
     
     def getApprCommCostGroup(self, c):
-        return c.get_max_hpp_group(self.args.edgeCombineEnabled) * 2
+        return c.get_max_hpp_group(True) * 2
     
     def getApprCommCostGlobal(self, c):
-        return c.get_hpp_global(self.args.edgeCombineEnabled) * 2
+        return c.get_hpp_global(True) * 2
     
     def getCommTimeGroup(self, c, dataSize, linkSpeed):
-        return c.get_d_group(self.args.edgeCombineEnabled, dataSize, linkSpeed) * 2
+        return c.get_d_group(True, dataSize, linkSpeed) * 2
     
     def getCommTimeGlobal(self, c, dataSize, linkSpeed):
-        return c.get_d_global(self.args.edgeCombineEnabled, dataSize, linkSpeed) * 2
+        return c.get_d_global(True, dataSize, linkSpeed) * 2
     
     def run(self):
         self.fwCost.writerow(['time', 'cntSteady', 'cost_prev', 'cost_new'])

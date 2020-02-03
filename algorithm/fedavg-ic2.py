@@ -71,7 +71,7 @@ class Algorithm(FedavgIcBaseAlgorithm):
         return c.get_DELTA()
     
     def getCommCost(self, c):
-        return c.get_sum_hpp_group(self.args.edgeCombineEnabled)
+        return c.get_sum_hpp_group(False)
     
     def getAssociateCost(self, c):
         pass

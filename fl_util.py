@@ -59,10 +59,6 @@ def parseArgs():
                     help='sgdEnabled',
                     type=bool,
                     default=True)
-    parser.add_argument('--edgeCombineEnabled',
-                    help='edgeCombineEnabled',
-                    type=bool,
-                    default=False)
     parser.add_argument('--maxEpoch',
                     help='maxEpoch',
                     type=int,
@@ -102,7 +98,7 @@ def parseArgs():
     parser.add_argument('--isValidation',
                     help='isValidation',
                     type=bool,
-                    default=True)
+                    default=False)
     parser.add_argument('--topologyName',
                     help='topologyName',
                     type=str,
@@ -111,7 +107,6 @@ def parseArgs():
     args = parser.parse_args()
     
     if args.modelName == 'sr':
-        if args.dataName == 'cifar10': raise Exception(args.modelName, args.dataName)
         args.sgdEnabled = False
         args.maxTime = 100
     elif args.modelName == '2nn':
@@ -121,15 +116,19 @@ def parseArgs():
         else:
             raise Exception(args.modelName, args.dataName)
     elif args.modelName == 'cnn-mnist':
-        if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
-            args.maxTime = 3000
-        elif args.dataName == 'femnist':
+        if args.dataName == 'mnist-o':
             args.maxTime = 6000
+        elif args.dataName == 'mnist-f':
+            args.maxTime = 8000
+        elif args.dataName == 'femnist':
+            args.maxTime = 6000 # TODO
         else:
             raise Exception(args.modelName, args.dataName)
     elif args.modelName == 'cnn-celeba':
-        if args.dataName != 'celeba': raise Exception(args.modelName, args.dataName)
-        args.maxTime = 1000
+        if args.dataName == 'celeba':
+            args.maxTime = 2000
+        else:
+            raise Exception(args.modelName, args.dataName)
     else:
         raise Exception(args.modelName)
         

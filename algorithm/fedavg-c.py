@@ -8,7 +8,7 @@ FedavgIcBaseAlgorithm = getattr(FedavgIcBaseModule, 'Algorithm')
 class Algorithm(FedavgIcBaseAlgorithm):
     
     def getAssociateCost(self, c):
-        return c.get_sum_hpp_group(self.args.edgeCombineEnabled)
+        return c.get_sum_hpp_group(False)
     
     def determineMedoidNids(self, c, nid2_g_i__w, g__w):
         return [ g.ps_nid for g in c.groups ]

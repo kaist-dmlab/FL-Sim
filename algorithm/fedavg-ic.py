@@ -59,7 +59,7 @@ class Algorithm(FedavgIcBaseAlgorithm):
                 c_sample.digest(nids_byGid, nid2_g_i__w, g__w)
                 
                 iid_costs.append(c_sample.get_DELTA())
-                comm_costs.append(c_sample.get_sum_hpp_group(self.args.edgeCombineEnabled))
+                comm_costs.append(c_sample.get_sum_hpp_group(False))
                 
                 for g in c_sample.groups:
                     N_k = g.get_N_k()
@@ -89,7 +89,7 @@ class Algorithm(FedavgIcBaseAlgorithm):
         
         print('Final cost_star=%.3f, numGroups=%d, d_group=%.3f, d_global=%.3f' % \
               (cost_star, len(c_star.groups), d_group, d_global))
-        print(c_star.get_DELTA()/self.norm_const_iid, c_star.get_sum_hpp_group(self.args.edgeCombineEnabled)/self.norm_const_comm)
+        print(c_star.get_DELTA()/self.norm_const_iid, c_star.get_sum_hpp_group(False)/self.norm_const_comm)
         
         print('Comm-IID Grouping Finished')
         return c_star
@@ -97,7 +97,7 @@ class Algorithm(FedavgIcBaseAlgorithm):
     def getAssociateCost(self, c):
         if self.norm_const_comm == 0 or self.norm_const_iid == 0:
             raise Exception(str(self.norm_const_iid), str(self.norm_const_comm))
-        return c.get_DELTA()/self.norm_const_iid + c.get_sum_hpp_group(self.args.edgeCombineEnabled)/self.norm_const_comm
+        return c.get_DELTA()/self.norm_const_iid + c.get_sum_hpp_group(False)/self.norm_const_comm
     
     def determineMedoidNids(self, c, nid2_g_i__w, g__w):
         medoidNids = []
