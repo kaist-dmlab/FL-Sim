@@ -127,17 +127,11 @@ def parseArgs():
     elif args.modelName == 'cnn-celeba':
         if args.dataName == 'celeba':
             args.maxTime = 2000
+            args.lrInitial = 0.001 # LEAF Paper
         else:
             raise Exception(args.modelName, args.dataName)
     else:
         raise Exception(args.modelName)
-        
-#     if args.dataName == 'cifar10':
-#         args.lrInitial = 0.01
-#     if args.dataName == 'femnist':
-#         args.lrInitial = 0.06 # LEAF Paper
-    if args.dataName == 'celeba':
-        args.lrInitial = 0.001 # LEAF Paper
     return args
 
 def initialize(seed=0):
