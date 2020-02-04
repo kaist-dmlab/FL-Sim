@@ -2,15 +2,17 @@ import numpy as np
 
 from scipy.stats import truncnorm
 from collections import Counter
-    
+from scipy.stats import truncexpon
+import scipy.optimize as so    
+
 def sample(data_by1Nid, numSamples):
     return [ { 'x': data_by1Nid[0]['x'][:numSamples], 'y': data_by1Nid[0]['y'][:numSamples] } ]
 
 def to_nids_byGid(z):
-    gids = np.unique([gid for gid in z if isinstance(gid, int)]) # 숫자만 필터링(None 제외) 후 Unique 적용
+    gids = np.unique([gid for gid in z if isinstance(gid, int)])
     for gid in range(len(gids)):
-        if not(gid in gids): raise Exception(str(gids)) # 모든 Group 이 사용되고 있는 지 검사
-    nids_byGid = [ sorted([ nid for nid, gid in enumerate(z) if gid == gid_ ]) for gid_ in gids ]
+        if not(gid in gids): return None
+    nids_byGid = [ [ nid for nid, gid in enumerate(z) if gid == gid_ ] for gid_ in gids ]
     return nids_byGid
 
 def to_z(numNodes, nids_byGid):
@@ -192,6 +194,40 @@ def sample_truncated_normal(mean=1, sd=1, low=1, upp=10, size=1):
         sampled = [int(a) for a in np.rint(sampled)]
     return sampled
 
+def sample_truncated_exponen(mean=1, sd=1, low=1, upp=10, size=1):
+    if (low == upp): # NUM_CLASS_NODE = NUM_CLASS_EDGE인 경우-->한 EDGE내 모든 NODE는 같은 CLASS를 가짐. 
+        sampled = [int(np.rint(low))]*size
+        return sampled
+    elif (mean >= upp) : # NUM_CLASS_NODE = NUM_CLASS_EDGE인 경우-->한 EDGE내 모든 NODE는 같은 CLASS를 가짐. 
+        sampled = [int(np.rint(upp))]*size
+        return sampled
+    elif (mean <= low):
+        sampled = [int(np.rint(low))]*size
+        return sampled
+    else:
+        sd = -1
+        low_ori = low
+        upp_ori = upp
+        while((sd<0) and (low < mean) and (upp > mean)):
+            A = np.array([low, upp])
+#             print(A,mean)
+            sd = 1/so.fmin(lambda L: ((np.diff(np.exp(-A*L)*(A*L+1)/L)/np.diff(np.exp(-A*L)))-mean)**2,
+                         x0=0.5,
+                         full_output=False, disp=False)
+            if mean > ((upp+low)/2):
+                low += 0.1
+            else:
+                upp -= 0.1
+        if (mean <= low):
+            sampled = [int(np.rint(mean))]*size
+            return sampled
+        elif (mean >= upp):
+            sampled = [int(np.rint(mean))]*size
+            return sampled
+        sampled = truncexpon( b=(upp-low)/sd, loc=low, scale=sd).rvs(size)
+        sampled = [int(a) for a in np.rint(sampled)]
+        return sampled
+    
 def groupByNode(data_by1Nid, nodeType, numNodes):
     data_byNid, z = groupByEdge(data_by1Nid, nodeType, 'a', numNodes, 1)
     return data_byNid
@@ -243,7 +279,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
         NUM_CLASS_EDGE_SAMPLED_MEAN = -100
         
         while(np.abs(NUM_CLASS_EDGE_SAMPLED_MEAN - NUM_CLASS_EDGE)>0.1): # mean error should be lower than 0.1
-            NUM_CLASS_EDGE_SAMPLED = sample_truncated_normal(mean=NUM_CLASS_EDGE, sd=1, low=1, upp=NUM_CLASS, size=NUM_EDGES)
+            NUM_CLASS_EDGE_SAMPLED = sample_truncated_exponen(mean=NUM_CLASS_EDGE, sd=1, low=0.8*NUM_CLASS_EDGE, upp=NUM_CLASS, size=NUM_EDGES)
             NUM_CLASS_EDGE_SAMPLED_MEAN = np.mean(NUM_CLASS_EDGE_SAMPLED)
         
         
@@ -309,7 +345,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
             
             NUM_CLASS_NODE_SAMPLED_MEAN = -100
             while(np.abs(NUM_CLASS_NODE_SAMPLED_MEAN - NUM_CLASS_NODE)>0.1): # mean error should be lower than 0.1 for sampling the number of class in each node for an edge
-                NUM_CLASS_NODE_SAMPLED = sample_truncated_normal(mean=NUM_CLASS_NODE, sd=1, low=1, upp=len(edge_class_list), size=NUM_NODES_PER_EDGE)
+                NUM_CLASS_NODE_SAMPLED = sample_truncated_exponen(mean=NUM_CLASS_NODE, sd=1, low=0.8*NUM_CLASS_NODE, upp=len(edge_class_list), size=NUM_NODES_PER_EDGE)
                 NUM_CLASS_NODE_SAMPLED_MEAN = np.mean(NUM_CLASS_NODE_SAMPLED)
                 if len(edge_class_list) < NUM_CLASS_NODE:
                     break
@@ -372,7 +408,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
             z_edge.append(edge_ind)
             for i in node_class_list: # i-th node
                 if initial_counter == 0: # make initial x,y dictionary for each node
-                    num_sampled = sample_truncated_normal(mean=NUM_DATA_PER_SAMPLED_CLASS[i], sd = 1, low=1, upp=2*NUM_DATA_PER_SAMPLED_CLASS[i], size=1)[0] # number of datapoint for a class in a node
+                    num_sampled = sample_truncated_exponen(mean=NUM_DATA_PER_SAMPLED_CLASS[i], sd = 1, low=0.95*NUM_DATA_PER_SAMPLED_CLASS[i], upp=1.5*NUM_DATA_PER_SAMPLED_CLASS[i], size=1)[0] # number of datapoint for a class in a node
                     if num_sampled > 2:
                         num_sampled -= 1
                     if NUM_DATA_PER_CLASS[i] > num_sampled:
@@ -391,7 +427,7 @@ def groupByEdge(data_by1Nid, nodeType, edgeType, numNodes, numEdges):
                         NUM_DATA_PER_CLASS[i] = 0
                         initial_counter += 1
                 else: # add next datapoint from other class to x,y dictionary for each node
-                    num_sampled = sample_truncated_normal(mean=NUM_DATA_PER_SAMPLED_CLASS[i], sd = 1, low=1, upp=2*NUM_DATA_PER_SAMPLED_CLASS[i], size=1)[0] # number of datapoint for a class in a node
+                    num_sampled = sample_truncated_exponen(mean=NUM_DATA_PER_SAMPLED_CLASS[i], sd = 1, low=0.95*NUM_DATA_PER_SAMPLED_CLASS[i], upp=1.5*NUM_DATA_PER_SAMPLED_CLASS[i], size=1)[0] # number of datapoint for a class in a node
                     if NUM_DATA_PER_CLASS[i] > num_sampled:
                         indice_sampled = np.random.choice(range(NUM_DATA_PER_CLASS[i]), size=num_sampled, replace=False).tolist()
                         trainData_byNid[-1]['x'] = np.concatenate([trainData_byNid[-1]['x'],DATA_BY_CLASS[i]['x'][indice_sampled]])
