@@ -224,7 +224,7 @@ class Algorithm(AbstractAlgorithm):
         return (c_star, delta_star, cntSteady, cntPrint)
     
     def runGrouping(self, c_edge, nid2_g_i__w, g__w):
-        print('IID Grouping Started')
+        print('Grouping Started')
         
         c = Cloud(c_edge.topology, c_edge.D_byNid, self.args.numGroups)
         z_rand = fl_data.groupRandomly(self.args.numNodes, self.args.numGroups)
@@ -241,7 +241,7 @@ class Algorithm(AbstractAlgorithm):
         print('Final cost_star=%.3f, numGroups=%d, d_group=%.3f, d_global=%.3f' % \
               (cost_star, len(c_star.groups), d_group, d_global))
         
-        print('IID Grouping Finished')
+        print('Grouping Finished')
         return c_star
     
     def runKMedoidsGrouping(self, c, nid2_g_i__w, g__w):
@@ -249,19 +249,25 @@ class Algorithm(AbstractAlgorithm):
         # https://en.wikipedia.org/wiki/K-medoids
         
         # Initialize Medoids
-        medoidNids = []
-        cntEid = 0
-        for gid in range(self.args.numGroups):
-            nidsInEdge = c.topology.getNids(cntEid % self.args.numEdges)
-            while True:
-                randNid = np.random.choice(nidsInEdge)
-                if randNid in medoidNids:
-                    continue
-                else:
-                    medoidNids.append(randNid)
-                    break
-            cntEid += 1
-#         medoidNids = np.random.choice(np.arange(self.args.numNodes), size=self.args.numGroups, replace=False)
+#         medoidNids = []
+#         cntEid = 0
+#         for gid in range(self.args.numGroups):
+#             nidsInEdge = c.topology.getNids(cntEid % self.args.numEdges)
+#             while True:
+#                 randNid = np.random.choice(nidsInEdge)
+#                 if randNid in medoidNids:
+#                     continue
+#                 else:
+#                     medoidNids.append(randNid)
+#                     break
+#             cntEid += 1
+        medoidNids = np.random.choice(np.arange(self.args.numNodes), size=self.args.numGroups, replace=False)
+
+        # Initialize Group Membership of Medoids
+#         z = fl_data.to_z(self.args.numNodes, c.nids_byGid)
+#         for k, medoidNid in enumerate(medoidNids):
+#             z[medoidNid] = k
+            
         print('Initial medoidNids:', sorted(medoidNids))
         
         # Associate
@@ -298,37 +304,37 @@ class Algorithm(AbstractAlgorithm):
         c = c.clone(nid2_g_i__w, g__w)
         medoidNids_byGid = [ [nid] for nid in medoidNids ]
         if c.digest(medoidNids_byGid, nid2_g_i__w, g__w) == False: raise Exception(str(medoidNids_byGid))
-        
+            
         # Shuffle index every iteration
         randNids = np.arange(self.args.numNodes)
         np.random.shuffle(randNids)
         
         z = fl_data.to_z(self.args.numNodes, c.nids_byGid)
-        for i in randNids:
+        for nid in randNids:
             # Medoid 일 경우 무시
-            if i in medoidNids: continue
+            if nid in medoidNids: continue
                 
             # Search for candidates with the same minimum cost
             costs = []
-            for k, g in enumerate(c.groups):
+            for k, medoidNid in enumerate(medoidNids):
                 # 목적지 그룹이 이전 그룹과 같을 경우 무시
-                if z[i] == k: continue
+                if z[nid] == k: continue
                     
                 # 그룹 멤버쉽 변경 시도
-                z[i] = k
+                z[nid] = k
                 
                 # Cloud Digest 시도
                 nids_byGid = fl_data.to_nids_byGid(z)
                 if c.digest(nids_byGid, nid2_g_i__w, g__w) == False: raise Exception(str(z), str(nids_byGid))
                     
                 # 다음 후보에 대한 Cost 계산
-                costs.append(self.getAssociateCost(c))
+                costs.append(self.getAssociateCost(c, nid, medoidNid))
             costs = np.array(costs)
             min_ks = np.where(costs == costs.min())[0]
             min_k = np.random.choice(min_ks)
-            z[i] = min_k # 다음 Iteration 에서 Digest
+            z[nid] = min_k # 다음 Iteration 에서 Digest
             cost_min = costs[min_k]
-            print('nid: %3d\tcurrent cost: %.3f' % (i, cost_min))
+            print('nid: %3d\tcurrent cost: %.3f' % (nid, cost_min))
             
         # 마지막 멤버십 초기화가 발생했을 수도 있으므로, Cloud Digest 시도
         nids_byGid = fl_data.to_nids_byGid(z)
@@ -337,13 +343,13 @@ class Algorithm(AbstractAlgorithm):
         for k, g in enumerate(c.groups):
             p_k = c.get_p_ks()[k]
             print(g.ps_nid, g.get_N_k(), p_k*g.get_DELTA_k())
-        print('DELTA: ', c.get_DELTA())
-        return c, cost_min
+        print('DELTA: ', c.get_DELTA(), c.get_sum_hpp_group(False))
+        return c, cost_min #self.getAssociateFinalCost(c)
     
     @abstractmethod
-    def getAssociateCost(self, c):
+    def getAssociateCost(self, c, nid, medoidNid):
         pass
-
+    
     @abstractmethod
     def determineMedoidNids(self, c, nid2_g_i__w, g__w):
         pass

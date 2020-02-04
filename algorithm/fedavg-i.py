@@ -7,7 +7,7 @@ FedavgIcBaseAlgorithm = getattr(FedavgIcBaseModule, 'Algorithm')
 
 class Algorithm(FedavgIcBaseAlgorithm):
     
-    def getAssociateCost(self, c):
+    def getAssociateCost(self, c, nid, medoidNid):
         return c.get_DELTA()
     
     def determineMedoidNids(self, c, nid2_g_i__w, g__w):
