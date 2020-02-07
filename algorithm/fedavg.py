@@ -5,7 +5,7 @@ class Algorithm(AbstractAlgorithm):
     def getFileName(self):
         tau1 = int(self.args.opaque1)
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + self.args.nodeType + self.args.edgeType + '_' + str(tau1)
+                + self.args.nodeType + self.args.edgeType + '_' + str(tau1) + '_' + str(self.args.seed)
     
     def getApprCommCostGlobal(self, c):
         return c.get_hpp_global(False) * 2

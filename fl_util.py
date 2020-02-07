@@ -109,7 +109,7 @@ def parseArgs():
     
     if args.modelName == 'sr':
         args.sgdEnabled = False
-        args.maxTime = 100
+        args.maxTime = 2000
     elif args.modelName == '2nn':
         args.sgdEnabled = False
         if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
@@ -118,17 +118,18 @@ def parseArgs():
             raise Exception(args.modelName, args.dataName)
     elif args.modelName == 'cnn-mnist':
         if args.dataName == 'mnist-o':
-            args.maxTime = 6000
+            args.maxTime = 3000
         elif args.dataName == 'mnist-f':
-            args.maxTime = 8000
+            args.maxTime = 4000
         elif args.dataName == 'femnist':
-            args.maxTime = 20000
+            args.maxTime = 10000
         else:
             raise Exception(args.modelName, args.dataName)
     elif args.modelName == 'cnn-celeba':
         if args.dataName == 'celeba':
-            args.maxTime = 2000
+            args.maxTime = 1000
             args.lrInitial = 0.001 # LEAF Paper
+            args.batchSize = 5 # LEAF Paper
         else:
             raise Exception(args.modelName, args.dataName)
     else:

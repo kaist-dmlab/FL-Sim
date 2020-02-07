@@ -6,7 +6,7 @@ class Algorithm(AbstractAlgorithm):
         tau1 = int(self.args.opaque1)
         tau2 = int(self.args.opaque2)
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + self.args.nodeType + self.args.edgeType + '_' + str(tau1) + '_' + str(tau2)
+                + self.args.nodeType + self.args.edgeType + '_' + str(tau1) + '_' + str(tau2) + '_' + str(self.args.seed)
     
     def getApprCommCostGroup(self, c):
         return c.get_max_hpp_group(False) * 2

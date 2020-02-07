@@ -24,7 +24,7 @@ class Algorithm(AbstractAlgorithm):
         tau1 = int(self.args.opaque1)
         tau2 = int(self.args.opaque2)
         return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' \
-                + self.args.nodeType + self.args.edgeType + '_' + str(tau1) + '_' + str(tau2) + '_' + str(self.args.numGroups)
+                + self.args.nodeType + self.args.edgeType + '_' + str(tau1) + '_' + str(tau2) + '_' + str(self.args.numGroups) + '_' + str(self.args.seed)
     
     def __init__(self, args):
         super().__init__(args)
@@ -344,7 +344,7 @@ class Algorithm(AbstractAlgorithm):
             p_k = c.get_p_ks()[k]
             print(g.ps_nid, g.get_N_k(), p_k*g.get_DELTA_k())
         print('DELTA: ', c.get_DELTA(), c.get_sum_hpp_group(False))
-        return c, cost_min #self.getAssociateFinalCost(c)
+        return c, cost_min
     
     @abstractmethod
     def getAssociateCost(self, c, nid, medoidNid):

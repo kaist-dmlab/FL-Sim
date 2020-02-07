@@ -3,7 +3,7 @@ from algorithm.abc import AbstractAlgorithm
 class Algorithm(AbstractAlgorithm):
     
     def getFileName(self):
-        return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName
+        return self.args.modelName + '_' + self.args.dataName + '_' + self.args.algName + '_' + str(self.args.seed)
     
     def getFlopOpsPerEpoch(self):
         return len(self.trainData_by1Nid[0]['x']) * self.model.flopOps
