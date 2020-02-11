@@ -86,6 +86,13 @@ class AbstractAlgorithm(ABC):
         self.fileEpoch.close()
         print()
         
+        w = self.model.getParams()
+        (g_is__w, nid2_g_i__w) = self.model.federated_collect_gradients(w, self.c.get_nid2_D_i())
+        g__w = np.average(g_is__w, axis=0, weights=self.c.get_p_is())
+        self.c.invalidate() # because all the groups need to be updated
+        self.c.digest(self.c.nids_byGid, nid2_g_i__w, g__w)
+        DELTA = self.c.get_DELTA()
+        
         print('Dump JSON...')
         totalComps = self.epoch * self.getFlopOpsPerEpoch()
         totalComms = self.getTotalComms()
@@ -99,7 +106,8 @@ class AbstractAlgorithm(ABC):
                     'totalComms': totalComms,
                     'd_local': d_local,
                     'd_group': d_group,
-                    'd_global': d_global
+                    'd_global': d_global,
+                    'DELTA': DELTA
                    }
         fileNameBase = self.getFileName()
         fl_util.dumpJson(os.path.join(fl_const.LOG_DIR_PATH, fileNameBase + '.json'), metadata)

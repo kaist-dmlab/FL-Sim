@@ -109,9 +109,8 @@ def parseArgs():
     
     if args.modelName == 'sr':
         args.sgdEnabled = False
-        args.maxTime = 2000
+        args.maxTime = 500
     elif args.modelName == '2nn':
-        args.sgdEnabled = False
         if args.dataName == 'mnist-o' or args.dataName == 'mnist-f':
             args.maxTime = 3000
         else:

@@ -8,7 +8,8 @@ from leaf.models.utils.tf_utils import graph_size
 def next_batch(batchSize, dataBatch):
     x = dataBatch['x']
     y = dataBatch['y']
-    idxRand = np.random.choice(np.arange(len(x)), size=batchSize, replace=False)
+    minBatchSize = min(batchSize, len(x)) # FIXME select minimum at other point
+    idxRand = np.random.choice(np.arange(len(x)), size=minBatchSize, replace=False)
     return x[idxRand], y[idxRand]
 
 def np_flatten(model):
@@ -158,6 +159,7 @@ class AbstractModel(ABC):
         return np.mean(losses_), np.mean(accs_)
     
     def evaluate(self, w):
+        # FIXME fix interface of evaluate_batch to remove redundant numSamples
         loss_train, acc_train = self.evaluate_batch(w, self.trainData_by1Nid[0], len(self.trainData_by1Nid[0]['x']))
         loss_test, acc_test = self.evaluate_batch(w, self.testData_by1Nid[0], len(self.testData_by1Nid[0]['x']))
         return loss_train, acc_train, loss_test, acc_test
