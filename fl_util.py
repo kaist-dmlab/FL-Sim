@@ -69,17 +69,16 @@ def parseArgs():
                     default=1000)
     # https://deviceatlas.com/blog/most-used-smartphone-gpu
     # https://en.wikipedia.org/wiki/PowerVR
-    # https://en.wikipedia.org/wiki/Adreno
     parser.add_argument('--procSpeeds',
                     help='procSpeeds',
                     type=int,
                     nargs='+',
-                    default=[250]) # GFLOPS unit [115, 250, 567] # PowerVR GX6450, PowerVR GT7600, Adreno 540
+                    default=[5]) # GFLOPS unit [5, 250] # Exynos 8895, PowerVR GT7600
     parser.add_argument('--linkSpeeds',
                     help='linkSpeeds',
                     type=int,
                     nargs='+',
-                    default=[10]) # MBps unit [1, 10, 100]
+                    default=[100]) # MBps unit [1, 10, 100]
     parser.add_argument('--lrInitial',
                     help='lrInitial',
                     type=float,
